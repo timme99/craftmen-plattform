@@ -1,12 +1,6 @@
 {
-    "experimentalServices": {
-        "frontend": {
-            "routePrefix": "/",
-            "framework": "nextjs"
-        },
-        "pdf-service": {
-            "entrypoint": "services/pdf-service",
-            "routePrefix": "/_/pdf-service"
-        }
-    }
+  "framework": "nextjs",
+  "buildCommand": "prisma generate && next build",
+  "installCommand": "npm install",
+  "outputDirectory": ".next"
 }
