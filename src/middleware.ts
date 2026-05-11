@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
   const publicPaths = ["/login", "/register", "/portal"];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
-  if (!user && !isPublic && !pathname.startsWith("/api/offers") && !pathname.startsWith("/api/pdf-extract/callback")) {
+  if (!user && !isPublic && !pathname.startsWith("/api/offers") && !pathname.startsWith("/api/pdf-extract/callback") && !pathname.startsWith("/api/auth/register")) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     return NextResponse.redirect(redirectUrl);

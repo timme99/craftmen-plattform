@@ -6,6 +6,7 @@ import UploadLvButton from "@/components/forms/UploadLvButton";
 import InquirySummary from "@/components/dashboard/InquirySummary";
 import SendInquiryButton from "@/components/forms/SendInquiryButton";
 import ExportPreisspiegelButton from "@/components/forms/ExportPreisspiegelButton";
+import ProjectStatusDropdown from "@/components/forms/ProjectStatusDropdown";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -51,7 +52,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <ProjectStatusBadge status={project.status} />
+          <ProjectStatusDropdown projectId={project.id} currentStatus={project.status} />
           {hasOffers && <ExportPreisspiegelButton projectId={project.id} />}
           <SendInquiryButton projectId={project.id} suppliers={allSuppliers} />
         </div>
