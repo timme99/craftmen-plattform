@@ -58,7 +58,6 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "LV hochgeladen", value: project.leistungsverzeichnis.length },
@@ -76,7 +75,6 @@ export default async function ProjectDetailPage({ params }: Props) {
         ))}
       </div>
 
-      {/* Leistungsverzeichnis */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Leistungsverzeichnisse</h2>
@@ -89,10 +87,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         ) : (
           <ul className="space-y-2">
             {project.leistungsverzeichnis.map((lv) => (
-              <li
-                key={lv.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 text-sm"
-              >
+              <li key={lv.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 text-sm">
                 <span className="font-medium truncate">{lv.fileName}</span>
                 <span
                   className={`ml-3 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
@@ -111,7 +106,6 @@ export default async function ProjectDetailPage({ params }: Props) {
         )}
       </div>
 
-      {/* Inquiries */}
       <InquirySummary projectId={project.id} inquiries={project.inquiries} />
     </div>
   );
