@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="CraftMen PDF Service", version="1.0.0")
+app = FastAPI(title="CraftMen PDF Service", version="1.0.0", root_path=os.environ.get("FASTAPI_ROOT_PATH", ""))
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
@@ -87,7 +87,6 @@ def extract_positions_from_text(text: str) -> list[ExtractedPosition]:
 
         match = POSITION_PATTERN.match(stripped)
         if match:
-            # Flush previous position
             if current_pos:
                 if long_text_lines:
                     current_pos["longText"] = " ".join(long_text_lines).strip()
@@ -103,7 +102,6 @@ def extract_positions_from_text(text: str) -> list[ExtractedPosition]:
             }
             sort_order += 1
         elif current_pos:
-            # Check if line is a unit+quantity continuation
             parts = stripped.split()
             if len(parts) <= 3 and parts[0].lower() in UNIT_KEYWORDS:
                 current_pos["unit"] = parts[0]
@@ -125,7 +123,6 @@ def extract_from_pdf_bytes(pdf_bytes: bytes) -> list[ExtractedPosition]:
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
         full_text = ""
         for page in pdf.pages:
-            # Try table extraction first (structured LVs)
             tables = page.extract_tables()
             for table in tables:
                 for row in table:
@@ -144,7 +141,6 @@ def extract_from_pdf_bytes(pdf_bytes: bytes) -> list[ExtractedPosition]:
                         )
             full_text += (page.extract_text() or "") + "\n"
 
-        # Fall back to text parsing if no table positions found
         if not positions and full_text.strip():
             positions = extract_positions_from_text(full_text)
 
@@ -166,7 +162,6 @@ async def extract(request: ExtractionRequest, background_tasks: BackgroundTasks)
 
 async def process_extraction(request: ExtractionRequest):
     try:
-        # Download PDF from Supabase Storage
         response = supabase.storage.from_(BUCKET_NAME).download(request.storagePath)
         pdf_bytes = response
 
