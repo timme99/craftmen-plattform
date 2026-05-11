@@ -3,6 +3,7 @@ import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import { getInboxMessages, getMessageAttachments } from "@/lib/graph/client";
 
+// POST /api/email-scanner — scannt Postfach nach Angebotsantworten
 export async function POST() {
   try {
     const user = await requireTenant();
@@ -18,8 +19,12 @@ export async function POST() {
       );
     }
 
+    // Lade alle offenen Anfragen die gesendet wurden
     const openInquiries = await prisma.inquiry.findMany({
-      where: { tenantId: user.tenantId, status: { in: ["SENT", "OPENED"] } },
+      where: {
+        tenantId: user.tenantId,
+        status: { in: ["SENT", "OPENED"] },
+      },
       include: { supplier: true, project: true },
     });
 
@@ -27,10 +32,12 @@ export async function POST() {
       return NextResponse.json({ message: "Keine offenen Anfragen.", processed: 0 });
     }
 
+    // Baue eine Map Supplier-Email → Inquiry für schnellen Lookup
     const supplierEmailMap = new Map(
       openInquiries.map((inq) => [inq.supplier.email.toLowerCase(), inq])
     );
 
+    // Nachrichten der letzten 30 Tage mit Anhang holen
     const since = new Date();
     since.setDate(since.getDate() - 30);
     const filter = `hasAttachments eq true and receivedDateTime ge ${since.toISOString()}`;
@@ -58,27 +65,36 @@ export async function POST() {
       const inquiry = supplierEmailMap.get(senderEmail);
       if (!inquiry) continue;
 
+      // Anhänge laden
       const attachmentsResult = await getMessageAttachments(
         emailConn.accessToken,
         emailConn.emailAddress,
         msg.id
       );
-      const attachments: Array<{ name: string; contentBytes: string; contentType: string }> =
-        attachmentsResult?.value ?? [];
+      const attachments: Array<{
+        name: string;
+        contentBytes: string;
+        contentType: string;
+      }> = attachmentsResult?.value ?? [];
 
       const pdfAttachments = attachments.filter(
-        (a) => a.contentType === "application/pdf" || a.name?.toLowerCase().endsWith(".pdf")
+        (a) =>
+          a.contentType === "application/pdf" ||
+          a.name?.toLowerCase().endsWith(".pdf")
       );
 
       if (pdfAttachments.length === 0) continue;
 
+      // An PDF-Service zur Extraktion schicken
       const pdfServiceUrl = process.env.PDF_SERVICE_URL;
       if (pdfServiceUrl) {
         for (const pdf of pdfAttachments) {
           const lvList = await prisma.leistungsverzeichnis.findFirst({
             where: { projectId: inquiry.projectId },
           });
+
           if (lvList) {
+            // Speichere das PDF in Supabase Storage via API und triggere Extraktion
             try {
               await fetch(`${pdfServiceUrl}/extract-from-base64`, {
                 method: "POST",
@@ -94,19 +110,27 @@ export async function POST() {
                 }),
               });
             } catch {
-              // Non-blocking
+              // Non-blocking — log and continue
             }
           }
         }
       }
 
+      // Inquiry-Status auf OFFER_RECEIVED setzen (Anhang empfangen)
       await prisma.inquiry.update({
         where: { id: inquiry.id },
-        data: { status: "OFFER_RECEIVED", emailMessageId: msg.id },
+        data: {
+          status: "OFFER_RECEIVED",
+          emailMessageId: msg.id,
+        },
       });
 
       processed++;
-      results.push({ supplier: inquiry.supplier.companyName, status: "verarbeitet", attachments: pdfAttachments.length });
+      results.push({
+        supplier: inquiry.supplier.companyName,
+        status: "verarbeitet",
+        attachments: pdfAttachments.length,
+      });
     }
 
     return NextResponse.json({

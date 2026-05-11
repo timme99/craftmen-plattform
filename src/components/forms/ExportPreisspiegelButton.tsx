@@ -10,7 +10,8 @@ export default function ExportPreisspiegelButton({ projectId }: { projectId: str
     setLoading(true);
     try {
       const res = await fetch(`/api/export?projectId=${projectId}`);
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error("Export fehlgeschlagen");
+
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -21,15 +22,18 @@ export default function ExportPreisspiegelButton({ projectId }: { projectId: str
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      alert("Export fehlgeschlagen.");
+      alert("Export fehlgeschlagen. Bitte erneut versuchen.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <button onClick={handleExport} disabled={loading}
-      className="flex items-center gap-2 border border-green-700 text-green-700 hover:bg-green-50 disabled:opacity-50 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors">
+    <button
+      onClick={handleExport}
+      disabled={loading}
+      className="flex items-center gap-2 border border-green-700 text-green-700 hover:bg-green-50 disabled:opacity-50 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+    >
       <Download className="w-3.5 h-3.5" />
       {loading ? "Wird erstellt…" : "Preisspiegel Excel"}
     </button>

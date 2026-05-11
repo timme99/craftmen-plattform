@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
     const buffer = await generatePriceComparison(projectId, user.tenantId);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type":

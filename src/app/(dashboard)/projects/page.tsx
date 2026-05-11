@@ -36,6 +36,7 @@ export default async function ProjectsPage() {
         </div>
       </div>
 
+      {/* Email connection hint */}
       {!emailConn && (
         <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-800 flex items-center gap-2">
           <span>⚠️</span>

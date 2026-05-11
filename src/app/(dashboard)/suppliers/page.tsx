@@ -37,12 +37,17 @@ export default async function SuppliersPage() {
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="font-semibold text-gray-900">{s.companyName}</h3>
-                  {s.contactName && <p className="text-sm text-gray-500">{s.contactName}</p>}
+                  {s.contactName && (
+                    <p className="text-sm text-gray-500">{s.contactName}</p>
+                  )}
                 </div>
                 {s.trade && (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{s.trade}</span>
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                    {s.trade}
+                  </span>
                 )}
               </div>
+
               <div className="space-y-1.5 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
                   <Mail className="w-3.5 h-3.5 text-gray-400" />
@@ -55,6 +60,7 @@ export default async function SuppliersPage() {
                   </div>
                 )}
               </div>
+
               <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-400">
                 {s._count.inquiries} Anfragen gesendet
               </div>

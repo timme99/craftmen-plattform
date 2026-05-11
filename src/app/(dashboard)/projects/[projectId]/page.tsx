@@ -6,6 +6,7 @@ import UploadLvButton from "@/components/forms/UploadLvButton";
 import InquirySummary from "@/components/dashboard/InquirySummary";
 import SendInquiryButton from "@/components/forms/SendInquiryButton";
 import ExportPreisspiegelButton from "@/components/forms/ExportPreisspiegelButton";
+import ProjectStatusDropdown from "@/components/forms/ProjectStatusDropdown";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -42,6 +43,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
@@ -50,7 +52,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <ProjectStatusBadge status={project.status} />
+          <ProjectStatusDropdown projectId={project.id} currentStatus={project.status} />
           {hasOffers && <ExportPreisspiegelButton projectId={project.id} />}
           <SendInquiryButton projectId={project.id} suppliers={allSuppliers} />
         </div>
@@ -59,7 +61,10 @@ export default async function ProjectDetailPage({ params }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "LV hochgeladen", value: project.leistungsverzeichnis.length },
-          { label: "Anfragen gesendet", value: project.inquiries.filter((i) => i.status !== "DRAFT").length },
+          {
+            label: "Anfragen gesendet",
+            value: project.inquiries.filter((i) => i.status !== "DRAFT").length,
+          },
           { label: "Angebote erhalten", value: offerCount },
           { label: "Lieferanten angefragt", value: project.inquiries.length },
         ].map((kpi) => (
@@ -84,11 +89,15 @@ export default async function ProjectDetailPage({ params }: Props) {
             {project.leistungsverzeichnis.map((lv) => (
               <li key={lv.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 text-sm">
                 <span className="font-medium truncate">{lv.fileName}</span>
-                <span className={`ml-3 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
-                  lv.extractionStatus === "COMPLETED" ? "bg-green-100 text-green-700"
-                  : lv.extractionStatus === "FAILED" ? "bg-red-100 text-red-700"
-                  : "bg-yellow-100 text-yellow-700"
-                }`}>
+                <span
+                  className={`ml-3 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
+                    lv.extractionStatus === "COMPLETED"
+                      ? "bg-green-100 text-green-700"
+                      : lv.extractionStatus === "FAILED"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
+                >
                   {lv.extractionStatus}
                 </span>
               </li>
