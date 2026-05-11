@@ -1,0 +1,12 @@
+{
+    "experimentalServices": {
+        "frontend": {
+            "routePrefix": "/",
+            "framework": "nextjs"
+        },
+        "pdf-service": {
+            "entrypoint": "services/pdf-service",
+            "routePrefix": "/_/pdf-service"
+        }
+    }
+}

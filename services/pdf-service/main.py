@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="CraftMen PDF Service", version="1.0.0")
+app = FastAPI(title="CraftMen PDF Service", version="1.0.0", root_path=os.environ.get("FASTAPI_ROOT_PATH", ""))
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
