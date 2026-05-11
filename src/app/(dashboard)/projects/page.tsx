@@ -2,17 +2,24 @@ import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import ProjectCard from "@/components/dashboard/ProjectCard";
 import CreateProjectButton from "@/components/forms/CreateProjectButton";
+import EmailScannerButton from "@/components/forms/EmailScannerButton";
 
 export default async function ProjectsPage() {
   const user = await requireTenant();
 
-  const projects = await prisma.project.findMany({
-    where: { tenantId: user.tenantId },
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: { select: { inquiries: true, leistungsverzeichnis: true } },
-    },
-  });
+  const [projects, emailConn] = await Promise.all([
+    prisma.project.findMany({
+      where: { tenantId: user.tenantId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { inquiries: true, leistungsverzeichnis: true } },
+      },
+    }),
+    prisma.emailConnection.findUnique({
+      where: { tenantId: user.tenantId },
+      select: { emailAddress: true, isActive: true },
+    }),
+  ]);
 
   return (
     <div>
@@ -23,8 +30,24 @@ export default async function ProjectsPage() {
             {projects.length} {projects.length === 1 ? "Projekt" : "Projekte"}
           </p>
         </div>
-        <CreateProjectButton />
+        <div className="flex items-center gap-3">
+          {emailConn?.isActive && <EmailScannerButton />}
+          <CreateProjectButton />
+        </div>
       </div>
+
+      {!emailConn && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-800 flex items-center gap-2">
+          <span>⚠️</span>
+          <span>
+            Noch kein Outlook-Konto verbunden.{" "}
+            <a href="/settings" className="font-medium underline">
+              Jetzt unter Einstellungen verbinden
+            </a>{" "}
+            um E-Mails automatisch zu senden und zu empfangen.
+          </span>
+        </div>
+      )}
 
       {projects.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
