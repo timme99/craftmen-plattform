@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data: inquiries }, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.errors }, { status: 422 });
+      return NextResponse.json({ error: err.issues }, { status: 422 });
     }
     console.error(err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
