@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -38,11 +38,16 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Public paths that don't require auth
   const publicPaths = ["/login", "/register", "/portal"];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
-  if (!user && !isPublic && !pathname.startsWith("/api/offers") && !pathname.startsWith("/api/pdf-extract/callback") && !pathname.startsWith("/api/auth/register")) {
+  if (
+    !user &&
+    !isPublic &&
+    !pathname.startsWith("/api/offers") &&
+    !pathname.startsWith("/api/pdf-extract/callback") &&
+    !pathname.startsWith("/api/auth/register")
+  ) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     return NextResponse.redirect(redirectUrl);
