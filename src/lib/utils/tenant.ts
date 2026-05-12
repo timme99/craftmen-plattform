@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma/client";
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export async function getCurrentTenant() {
   const supabase = await createClient();
@@ -23,6 +24,6 @@ export async function getCurrentTenant() {
 
 export async function requireTenant() {
   const user = await getCurrentTenant();
-  if (!user) throw new Error("Unauthorized");
+  if (!user) redirect("/login");
   return user;
 }
