@@ -13,13 +13,13 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    const supabase = createClient();
     const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
 
     if (signUpError || !data.user) {
@@ -53,7 +53,6 @@ export default function RegisterPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">CraftMen Plattform</h1>
-            <p className="text-xs text-gray-400 italic">Investieren mit Durchblick</p>
           </div>
         </div>
 

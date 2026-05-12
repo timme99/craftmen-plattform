@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 const schema = z.object({
@@ -26,26 +26,50 @@ export async function POST(req: NextRequest) {
     }
     const { companyName, email, supabaseId } = parsed.data;
 
-    const existing = await prisma.user.findUnique({ where: { supabaseId } });
-    if (existing) return NextResponse.json({ error: "Nutzer existiert bereits" }, { status: 409 });
+    const admin = createAdminClient();
+
+    const { data: existingUser } = await admin
+      .from("users")
+      .select("id")
+      .eq("supabaseId", supabaseId)
+      .maybeSingle();
+
+    if (existingUser) {
+      return NextResponse.json({ error: "Nutzer existiert bereits" }, { status: 409 });
+    }
 
     let slug = toSlug(companyName);
-    const slugExists = await prisma.tenant.findUnique({ where: { slug } });
-    if (slugExists) slug = `${slug}-${Date.now()}`;
+    const { data: existingSlug } = await admin
+      .from("tenants")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
 
-    const tenant = await prisma.tenant.create({
-      data: {
-        name: companyName,
-        slug,
-        users: {
-          create: {
-            supabaseId,
-            email,
-            role: "OWNER",
-          },
-        },
-      },
+    if (existingSlug) slug = `${slug}-${Date.now()}`;
+
+    const { data: tenant, error: tenantError } = await admin
+      .from("tenants")
+      .insert({ name: companyName, slug })
+      .select("id")
+      .single();
+
+    if (tenantError || !tenant) {
+      console.error(tenantError);
+      return NextResponse.json({ error: "Tenant-Erstellung fehlgeschlagen" }, { status: 500 });
+    }
+
+    const { error: userError } = await admin.from("users").insert({
+      tenantId: tenant.id,
+      supabaseId,
+      email,
+      role: "OWNER",
     });
+
+    if (userError) {
+      console.error(userError);
+      await admin.from("tenants").delete().eq("id", tenant.id);
+      return NextResponse.json({ error: "Nutzer-Erstellung fehlgeschlagen" }, { status: 500 });
+    }
 
     return NextResponse.json({ tenantId: tenant.id }, { status: 201 });
   } catch (err) {

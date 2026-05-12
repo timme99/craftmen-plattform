@@ -59,7 +59,6 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="px-5 py-4 border-t border-green-800">
-        <p className="text-green-500 text-xs italic">Investieren mit Durchblick</p>
       </div>
     </aside>
   );

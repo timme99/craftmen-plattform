@@ -12,13 +12,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
@@ -39,7 +39,6 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">CraftMen Plattform</h1>
-            <p className="text-xs text-gray-400 italic">Investieren mit Durchblick</p>
           </div>
         </div>
 

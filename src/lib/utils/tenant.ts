@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma/client";
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export async function getCurrentTenant() {
   const supabase = await createClient();
@@ -10,16 +11,19 @@ export async function getCurrentTenant() {
 
   if (error || !user) return null;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-    include: { tenant: true },
-  });
-
-  return dbUser;
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { supabaseId: user.id },
+      include: { tenant: true },
+    });
+    return dbUser;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireTenant() {
   const user = await getCurrentTenant();
-  if (!user) throw new Error("Unauthorized");
+  if (!user) redirect("/login");
   return user;
 }
