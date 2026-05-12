@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "CraftMen Plattform — Investieren mit Durchblick",
+  title: "CraftMen Plattform",
   description:
     "Die SaaS-Lösung für Garten- und Landschaftsbau: Leistungsverzeichnisse digitalisieren, Lieferanten anfragen, Preisspiegel erstellen.",
 };

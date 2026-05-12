@@ -10,12 +10,15 @@ export async function getCurrentTenant() {
 
   if (error || !user) return null;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: user.id },
-    include: { tenant: true },
-  });
-
-  return dbUser;
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { supabaseId: user.id },
+      include: { tenant: true },
+    });
+    return dbUser;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireTenant() {

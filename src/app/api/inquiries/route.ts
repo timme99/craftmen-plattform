@@ -107,7 +107,6 @@ function buildEmailHtml(params: {
     <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
       <div style="background: #2D6A4F; padding: 20px 30px;">
         <h1 style="color: white; margin: 0; font-size: 22px;">CraftMen Plattform</h1>
-        <p style="color: #D8F3DC; margin: 4px 0 0 0; font-size: 13px;">Investieren mit Durchblick</p>
       </div>
       <div style="padding: 30px; background: #ffffff;">
         <p>Sehr geehrte Damen und Herren von <strong>${params.supplierName}</strong>,</p>
