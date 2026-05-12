@@ -53,7 +53,6 @@ export default async function SupplierPortalPage({ params }: Props) {
             </p>
             <h1 className="text-xl font-bold">Angebotsportal</h1>
           </div>
-          <p className="text-green-200 text-sm">Investieren mit Durchblick</p>
         </div>
       </header>
 
