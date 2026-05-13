@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
-import ProjectStatusBadge from "@/components/dashboard/ProjectStatusBadge";
 import UploadLvButton from "@/components/forms/UploadLvButton";
 import InquirySummary from "@/components/dashboard/InquirySummary";
 import SendInquiryButton from "@/components/forms/SendInquiryButton";
 import ExportPreisspiegelButton from "@/components/forms/ExportPreisspiegelButton";
 import ProjectStatusDropdown from "@/components/forms/ProjectStatusDropdown";
+import ProjectAutomationActions from "@/components/forms/ProjectAutomationActions";
+import AwardProjectForm from "@/components/forms/AwardProjectForm";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -41,6 +42,21 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   const hasOffers = offerCount > 0;
 
+  const offerOptions = project.inquiries
+    .filter((i) => i.offers.length > 0)
+    .map((i) => ({
+      id: i.id,
+      supplier: i.supplier.companyName,
+      totalNet: Number(i.offers[0].totalNet ?? 0),
+    }))
+    .sort((a, b) => a.totalNet - b.totalNet);
+
+  const timeline = project.inquiries.flatMap((i) => ([
+    { at: i.createdAt, label: `Anfrage erstellt: ${i.supplier.companyName}` },
+    i.sentAt ? { at: i.sentAt, label: `Anfrage gesendet: ${i.supplier.companyName}` } : null,
+    i.portalOpenedAt ? { at: i.portalOpenedAt, label: `Portal geöffnet: ${i.supplier.companyName}` } : null,
+  ])).filter(Boolean).sort((a, b) => +new Date(b!.at) - +new Date(a!.at)) as Array<{at: Date; label: string}>;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -55,6 +71,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           <ProjectStatusDropdown projectId={project.id} currentStatus={project.status} />
           {hasOffers && <ExportPreisspiegelButton projectId={project.id} />}
           <SendInquiryButton projectId={project.id} suppliers={allSuppliers} />
+          <ProjectAutomationActions />
         </div>
       </div>
 
@@ -104,6 +121,33 @@ export default async function ProjectDetailPage({ params }: Props) {
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <AwardProjectForm projectId={project.id} options={offerOptions} />
+        <div className="bg-white rounded-xl border p-4">
+          <h3 className="font-semibold mb-2">Lieferanten-Performance</h3>
+          <ul className="text-sm space-y-1">
+            {project.inquiries.map((i) => (
+              <li key={i.id} className="flex justify-between">
+                <span>{i.supplier.companyName}</span>
+                <span className="text-gray-500">{i.status}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border p-4">
+        <h3 className="font-semibold mb-2">Kommunikations-Timeline</h3>
+        <ul className="text-sm space-y-1">
+          {timeline.slice(0, 12).map((t, idx) => (
+            <li key={idx} className="flex justify-between">
+              <span>{t.label}</span>
+              <span className="text-gray-500">{new Date(t.at).toLocaleDateString("de-DE")}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <InquirySummary projectId={project.id} inquiries={project.inquiries} />
