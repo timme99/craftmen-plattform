@@ -22,8 +22,16 @@ export default function RegisterPage() {
     const supabase = createClient();
     const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
 
-    if (signUpError || !data.user) {
-      setError(signUpError?.message ?? "Registrierung fehlgeschlagen");
+    const isExistingAccount = Boolean(
+      data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0
+    );
+
+    if (signUpError || !data.user || isExistingAccount) {
+      if (isExistingAccount) {
+        setError("Diese E-Mail ist bereits registriert. Bitte melde dich an.");
+      } else {
+        setError(signUpError?.message ?? "Registrierung fehlgeschlagen");
+      }
       setLoading(false);
       return;
     }
@@ -35,7 +43,12 @@ export default function RegisterPage() {
     });
 
     if (!res.ok) {
-      const body = await res.json();
+      let body: { error?: string } = {};
+      try {
+        body = await res.json();
+      } catch {
+        // no-op
+      }
       setError(body.error ?? "Tenant-Erstellung fehlgeschlagen");
       setLoading(false);
       return;

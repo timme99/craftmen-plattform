@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  const publicPaths = ["/login", "/register", "/portal"];
+  const publicPaths = ["/login", "/register", "/forgot-password", "/portal"];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
   if (
