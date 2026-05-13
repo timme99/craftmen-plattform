@@ -32,9 +32,13 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // Stale or invalid refresh token — treat as unauthenticated and redirect to login
+  }
 
   const { pathname } = request.nextUrl;
 
