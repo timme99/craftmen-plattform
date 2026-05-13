@@ -33,7 +33,8 @@ export async function requireTenant() {
 
   const dbUser = await prisma.user
     .findUnique({ where: { supabaseId: user.id }, include: { tenant: true } })
-    .catch(() => {
+    .catch((err) => {
+      console.error("[requireTenant] Prisma error:", err);
       throw new Error("Datenbankverbindung fehlgeschlagen. Bitte versuche es erneut.");
     });
 
