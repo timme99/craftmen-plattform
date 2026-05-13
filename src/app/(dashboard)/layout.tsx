@@ -8,12 +8,14 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // AUTH DISABLED — restore check when login is re-enabled
+  // const supabase = await createClient();
+  // const {
+  //   data: { user },
+  // } = await supabase.auth.getUser();
+  // if (!user) redirect("/login");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
+  const { data: { user } } = await supabase.auth.getUser();
 
   return (
     <div className="flex h-screen bg-gray-50">
