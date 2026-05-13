@@ -41,18 +41,17 @@ export async function proxy(request: NextRequest) {
   const publicPaths = ["/login", "/register", "/portal"];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
-  // AUTH DISABLED — re-enable when login is ready
-  // if (
-  //   !user &&
-  //   !isPublic &&
-  //   !pathname.startsWith("/api/offers") &&
-  //   !pathname.startsWith("/api/pdf-extract/callback") &&
-  //   !pathname.startsWith("/api/auth/register")
-  // ) {
-  //   const redirectUrl = request.nextUrl.clone();
-  //   redirectUrl.pathname = "/login";
-  //   return NextResponse.redirect(redirectUrl);
-  // }
+  if (
+    !user &&
+    !isPublic &&
+    !pathname.startsWith("/api/offers") &&
+    !pathname.startsWith("/api/pdf-extract/callback") &&
+    !pathname.startsWith("/api/auth/register")
+  ) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    return NextResponse.redirect(redirectUrl);
+  }
 
   return supabaseResponse;
 }
