@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Leaf } from "lucide-react";
 
@@ -11,7 +10,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -25,8 +23,7 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.refresh();
-      router.push("/projects");
+      window.location.href = "/projects";
     }
   }
 
