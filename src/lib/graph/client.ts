@@ -36,7 +36,7 @@ export async function sendInquiryEmail(
     }));
   }
 
-  return client.api(`/users/${params.from}/sendMail`).post({ message });
+  return client.api("/me/sendMail").post({ message });
 }
 
 export async function getInboxMessages(

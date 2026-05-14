@@ -50,14 +50,12 @@ export async function POST(req: NextRequest) {
         where: { id: { in: validated.supplierIds }, tenantId: user.tenantId },
       });
 
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         inquiries.map(async (inquiry) => {
-          const supplier = suppliers.find((s) =>
-            validated.supplierIds.includes(s.id)
-          );
+          const supplier = suppliers.find((s) => s.id === inquiry.supplierId);
           if (!supplier) return;
 
-          const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/portal/${inquiry.portalToken}`;
+          const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/portal/${inquiry.portalToken}`;
 
           await sendInquiryEmail(emailConn.accessToken!, {
             from: emailConn.emailAddress!,
@@ -78,6 +76,12 @@ export async function POST(req: NextRequest) {
           });
         })
       );
+
+      for (const result of results) {
+        if (result.status === "rejected") {
+          console.error("[inquiries] email send failed:", result.reason);
+        }
+      }
     }
 
     return NextResponse.json({ data: inquiries }, { status: 201 });
