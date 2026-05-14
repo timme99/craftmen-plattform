@@ -3,7 +3,18 @@ import { prisma } from "@/lib/prisma/client";
 import DisconnectMicrosoftButton from "@/components/forms/DisconnectMicrosoftButton";
 import { CheckCircle, AlertCircle, Mail, Building2, Users } from "lucide-react";
 
-export default async function SettingsPage() {
+const errorMessages: Record<string, string> = {
+  no_code: "Microsoft hat keinen Autorisierungscode zurückgegeben.",
+  token_exchange: "Der Token-Austausch mit Microsoft ist fehlgeschlagen. Bitte versuche es erneut.",
+  unknown: "Ein unbekannter Fehler ist aufgetreten. Bitte versuche es erneut.",
+};
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; success?: string }>;
+}) {
+  const { error, success } = await searchParams;
   const user = await requireTenant();
 
   const [emailConn, teamMembers] = await Promise.all([
@@ -29,6 +40,19 @@ export default async function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
         <p className="text-sm text-gray-500 mt-1">Konto und Integrationen verwalten</p>
       </div>
+
+      {success === "connected" && (
+        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+          <CheckCircle className="w-4 h-4 shrink-0" />
+          <span>Microsoft Outlook wurde erfolgreich verbunden.</span>
+        </div>
+      )}
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{errorMessages[error] ?? "Ein Fehler ist aufgetreten."}</span>
+        </div>
+      )}
 
       {/* Microsoft / Outlook */}
       <section className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">

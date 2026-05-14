@@ -3,19 +3,23 @@ import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 
 export async function GET(req: NextRequest) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+
+  // Outside try/catch so Next.js redirect() errors propagate correctly
+  const user = await requireTenant();
+
   try {
-    const user = await requireTenant();
     const { searchParams } = req.nextUrl;
     const code = searchParams.get("code");
 
     if (!code) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/settings?error=no_code`);
+      return NextResponse.redirect(`${baseUrl}/settings?error=no_code`);
     }
 
     const clientId = process.env.MICROSOFT_CLIENT_ID!;
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET!;
     const tenantId = process.env.MICROSOFT_TENANT_ID ?? "common";
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/api/auth/microsoft/callback`;
+    const redirectUri = `${baseUrl}/api/auth/microsoft/callback`;
 
     const tokenRes = await fetch(
       `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
@@ -33,12 +37,13 @@ export async function GET(req: NextRequest) {
     );
 
     if (!tokenRes.ok) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/settings?error=token_exchange`);
+      const errBody = await tokenRes.text();
+      console.error("[microsoft/callback] token exchange failed:", tokenRes.status, errBody);
+      return NextResponse.redirect(`${baseUrl}/settings?error=token_exchange`);
     }
 
     const tokens = await tokenRes.json();
 
-    // Get email address from Graph
     const profileRes = await fetch("https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
@@ -66,9 +71,9 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/settings?success=connected`);
+    return NextResponse.redirect(`${baseUrl}/settings?success=connected`);
   } catch (err) {
-    console.error(err);
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/settings?error=unknown`);
+    console.error("[microsoft/callback] error:", err);
+    return NextResponse.redirect(`${baseUrl}/settings?error=unknown`);
   }
 }
