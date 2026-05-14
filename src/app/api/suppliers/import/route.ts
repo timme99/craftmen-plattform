@@ -14,6 +14,8 @@ const rowSchema = z.object({
   notes: z.string().optional(),
 });
 
+type RowData = z.infer<typeof rowSchema>;
+
 function cellText(cell: ExcelJS.Cell): string {
   const v = cell.value;
   if (v === null || v === undefined) return "";
@@ -41,9 +43,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Excel-Datei enthält kein Tabellenblatt" }, { status: 400 });
     }
 
-    const results = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
+    const validRows: RowData[] = [];
+    const errors: string[] = [];
+    let skipped = 0;
 
-    // Skip header row (row 1), process from row 2
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
 
@@ -57,25 +60,23 @@ export async function POST(req: NextRequest) {
         notes: cellText(row.getCell(7)) || undefined,
       };
 
-      // Skip fully empty rows
       if (!raw.companyName && !raw.email) return;
 
       const parsed = rowSchema.safeParse(raw);
       if (!parsed.success) {
-        results.errors.push(`Zeile ${rowNumber}: ${parsed.error.issues.map((i) => i.message).join(", ")}`);
-        results.skipped++;
+        errors.push(`Zeile ${rowNumber}: ${parsed.error.issues.map((i) => i.message).join(", ")}`);
+        skipped++;
         return;
       }
 
-      // Collect for batch upsert — we'll process after eachRow
-      (results as unknown as { rows: typeof parsed.data[] }).rows ??= [];
-      (results as unknown as { rows: typeof parsed.data[] }).rows.push(parsed.data);
+      validRows.push(parsed.data);
     });
 
-    const rows = (results as unknown as { rows: typeof rowSchema._type[] }).rows ?? [];
+    let created = 0;
+    let updated = 0;
 
     await Promise.all(
-      rows.map(async (data) => {
+      validRows.map(async (data) => {
         const existing = await prisma.supplier.findUnique({
           where: { tenantId_email: { tenantId: user.tenantId, email: data.email } },
         });
@@ -85,17 +86,17 @@ export async function POST(req: NextRequest) {
             where: { id: existing.id },
             data: { ...data, isActive: true },
           });
-          results.updated++;
+          updated++;
         } else {
           await prisma.supplier.create({
             data: { ...data, tenantId: user.tenantId },
           });
-          results.created++;
+          created++;
         }
       })
     );
 
-    return NextResponse.json({ data: results });
+    return NextResponse.json({ data: { created, updated, skipped, errors } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";
     return NextResponse.json({ error: message }, { status: 500 });
