@@ -46,6 +46,7 @@ export async function proxy(request: NextRequest) {
     !isPublic &&
     !pathname.startsWith("/api/offers") &&
     !pathname.startsWith("/api/pdf-extract/callback") &&
+    !pathname.startsWith("/api/email-scanner/offer-callback") &&
     !pathname.startsWith("/api/auth/register")
   ) {
     const redirectUrl = request.nextUrl.clone();

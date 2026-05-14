@@ -1,16 +1,15 @@
 """
-CraftMen PDF Extraction Microservice
-FastAPI + pdfplumber — extrahiert Positionen aus Leistungsverzeichnissen (GAEB/PDF)
+CraftMen PDF Extraction — Vercel Serverless Version
+Synchronous: extraction + callback happen within the single request lifecycle.
 """
 
 import os
 import re
+import base64
 import httpx
-import asyncio
 import pdfplumber
 from io import BytesIO
-import base64
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Header
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from supabase import create_client, Client
 from typing import Optional
@@ -18,7 +17,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="CraftMen PDF Service", version="1.0.0", root_path=os.environ.get("FASTAPI_ROOT_PATH", ""))
+app = FastAPI(
+    title="CraftMen PDF Service",
+    version="1.0.0",
+    root_path=os.environ.get("FASTAPI_ROOT_PATH", "/_/pdf-service"),
+)
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
@@ -163,18 +166,10 @@ def health():
 
 
 @app.post("/extract")
-async def extract(request: ExtractionRequest, background_tasks: BackgroundTasks):
-    background_tasks.add_task(process_extraction, request)
-    return {"accepted": True, "lvId": request.lvId}
-
-
-async def process_extraction(request: ExtractionRequest):
+async def extract(request: ExtractionRequest):
     try:
-        response = supabase.storage.from_(BUCKET_NAME).download(request.storagePath)
-        pdf_bytes = response
-
+        pdf_bytes = supabase.storage.from_(BUCKET_NAME).download(request.storagePath)
         positions = extract_from_pdf_bytes(pdf_bytes)
-
         payload = {
             "lvId": request.lvId,
             "secret": PDF_SERVICE_SECRET,
@@ -190,31 +185,22 @@ async def process_extraction(request: ExtractionRequest):
         }
 
     async with httpx.AsyncClient(timeout=30) as client:
-        for attempt in range(3):
-            try:
-                await client.post(request.callbackUrl, json=payload)
-                break
-            except Exception:
-                await asyncio.sleep(2**attempt)
+        await client.post(request.callbackUrl, json=payload)
+
+    return {"ok": True}
 
 
 @app.post("/extract-from-base64")
 async def extract_from_base64(
     request: Base64ExtractionRequest,
-    background_tasks: BackgroundTasks,
     x_service_secret: Optional[str] = Header(None),
 ):
     if x_service_secret != PDF_SERVICE_SECRET:
         raise HTTPException(status_code=403, detail="Forbidden")
-    background_tasks.add_task(process_base64_extraction, request)
-    return {"accepted": True, "inquiryId": request.inquiryId}
 
-
-async def process_base64_extraction(request: Base64ExtractionRequest):
     try:
         pdf_bytes = base64.b64decode(request.contentBase64)
         positions = extract_from_pdf_bytes(pdf_bytes)
-
         payload = {
             "inquiryId": request.inquiryId,
             "secret": PDF_SERVICE_SECRET,
@@ -230,9 +216,6 @@ async def process_base64_extraction(request: Base64ExtractionRequest):
         }
 
     async with httpx.AsyncClient(timeout=30) as client:
-        for attempt in range(3):
-            try:
-                await client.post(request.callbackUrl, json=payload)
-                break
-            except Exception:
-                await asyncio.sleep(2**attempt)
+        await client.post(request.callbackUrl, json=payload)
+
+    return {"ok": True}
