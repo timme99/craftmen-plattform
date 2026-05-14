@@ -1,6 +1,7 @@
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import CreateSupplierButton from "@/components/forms/CreateSupplierButton";
+import SupplierImportExportButtons from "@/components/forms/SupplierImportExportButtons";
 import { Mail, Phone, Building2 } from "lucide-react";
 
 export default async function SuppliersPage() {
@@ -21,7 +22,10 @@ export default async function SuppliersPage() {
             {suppliers.length} {suppliers.length === 1 ? "Lieferant" : "Lieferanten"}
           </p>
         </div>
-        <CreateSupplierButton />
+        <div className="flex items-center gap-2">
+          <SupplierImportExportButtons />
+          <CreateSupplierButton />
+        </div>
       </div>
 
       {suppliers.length === 0 ? (
