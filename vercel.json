@@ -1,13 +1,11 @@
 {
   "functions": {
-    "api/pdf_service.py": {
-      "maxDuration": 60
-    }
+    "api/pdf-service-extract.py": { "maxDuration": 60 },
+    "api/pdf-service-b64.py": { "maxDuration": 60 }
   },
   "rewrites": [
-    {
-      "source": "/_/pdf-service/:path*",
-      "destination": "/api/pdf_service"
-    }
+    { "source": "/_/pdf-service/extract", "destination": "/api/pdf-service-extract" },
+    { "source": "/_/pdf-service/extract-from-base64", "destination": "/api/pdf-service-b64" },
+    { "source": "/_/pdf-service/health", "destination": "/api/pdf-service-health" }
   ]
 }
