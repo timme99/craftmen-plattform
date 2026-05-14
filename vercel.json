@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/pdf_service.py": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/_/pdf-service/:path*",
+      "destination": "/api/pdf_service"
+    }
+  ]
+}

@@ -38,7 +38,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });
     }
 
-    // Create LV record
+    const pythonServiceUrl = process.env.PDF_SERVICE_URL;
+
+    // Create LV record — set PROCESSING immediately if service is configured
+    // to avoid a race condition where the callback arrives before the status update
     const lv = await prisma.leistungsverzeichnis.create({
       data: {
         projectId,
@@ -46,12 +49,10 @@ export async function POST(req: NextRequest) {
         fileName: file.name,
         storagePath,
         mimeType: file.type,
-        extractionStatus: "PENDING",
+        extractionStatus: pythonServiceUrl ? "PROCESSING" : "PENDING",
       },
     });
 
-    // Trigger async extraction via Python microservice
-    const pythonServiceUrl = process.env.PDF_SERVICE_URL;
     if (pythonServiceUrl) {
       fetch(`${pythonServiceUrl}/extract`, {
         method: "POST",
@@ -62,11 +63,6 @@ export async function POST(req: NextRequest) {
           callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/pdf-extract/callback`,
         }),
       }).catch(console.error);
-
-      await prisma.leistungsverzeichnis.update({
-        where: { id: lv.id },
-        data: { extractionStatus: "PROCESSING" },
-      });
     }
 
     return NextResponse.json({ data: lv }, { status: 201 });
