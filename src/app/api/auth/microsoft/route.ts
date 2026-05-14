@@ -7,7 +7,7 @@ export async function GET() {
 
     const clientId = process.env.MICROSOFT_CLIENT_ID;
     const tenantId = process.env.MICROSOFT_TENANT_ID ?? "common";
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/microsoft/callback`;
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/api/auth/microsoft/callback`;
 
     if (!clientId) {
       return NextResponse.json({ error: "Microsoft OAuth nicht konfiguriert" }, { status: 500 });
