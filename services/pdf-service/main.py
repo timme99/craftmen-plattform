@@ -9,7 +9,8 @@ import httpx
 import asyncio
 import pdfplumber
 from io import BytesIO
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+import base64
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Header
 from pydantic import BaseModel
 from supabase import create_client, Client
 from typing import Optional
@@ -30,6 +31,13 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 class ExtractionRequest(BaseModel):
     lvId: str
     storagePath: str
+    callbackUrl: str
+
+
+class Base64ExtractionRequest(BaseModel):
+    inquiryId: str
+    fileName: str
+    contentBase64: str
     callbackUrl: str
 
 
@@ -176,6 +184,46 @@ async def process_extraction(request: ExtractionRequest):
     except Exception as exc:
         payload = {
             "lvId": request.lvId,
+            "secret": PDF_SERVICE_SECRET,
+            "success": False,
+            "error": str(exc),
+        }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        for attempt in range(3):
+            try:
+                await client.post(request.callbackUrl, json=payload)
+                break
+            except Exception:
+                await asyncio.sleep(2**attempt)
+
+
+@app.post("/extract-from-base64")
+async def extract_from_base64(
+    request: Base64ExtractionRequest,
+    background_tasks: BackgroundTasks,
+    x_service_secret: Optional[str] = Header(None),
+):
+    if x_service_secret != PDF_SERVICE_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    background_tasks.add_task(process_base64_extraction, request)
+    return {"accepted": True, "inquiryId": request.inquiryId}
+
+
+async def process_base64_extraction(request: Base64ExtractionRequest):
+    try:
+        pdf_bytes = base64.b64decode(request.contentBase64)
+        positions = extract_from_pdf_bytes(pdf_bytes)
+
+        payload = {
+            "inquiryId": request.inquiryId,
+            "secret": PDF_SERVICE_SECRET,
+            "success": True,
+            "positions": [p.model_dump() for p in positions],
+        }
+    except Exception as exc:
+        payload = {
+            "inquiryId": request.inquiryId,
             "secret": PDF_SERVICE_SECRET,
             "success": False,
             "error": str(exc),
