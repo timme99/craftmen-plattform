@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import {
-  FolderOpen,
-  Users,
-  Settings,
-  BarChart3,
-  Leaf,
-} from "lucide-react";
+import { FolderOpen, Users, Settings, Leaf, Sparkles } from "lucide-react";
 
 const navItems = [
   { href: "/projects", label: "Projekte", icon: FolderOpen },
@@ -21,22 +15,20 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-60 flex-shrink-0 bg-green-900 flex flex-col">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-green-800">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-green-400 flex items-center justify-center">
-            <Leaf className="w-5 h-5 text-green-900" />
+    <aside className="w-64 flex-shrink-0 bg-gradient-to-b from-green-950 via-green-900 to-emerald-900 text-white flex flex-col">
+      <div className="px-5 py-5 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-green-300/90 flex items-center justify-center shadow-sm shadow-green-950/40">
+            <Leaf className="w-5 h-5 text-green-950" />
           </div>
           <div>
-            <p className="text-white font-bold text-sm leading-tight">CraftMen</p>
-            <p className="text-green-400 text-xs leading-tight">Plattform</p>
+            <p className="text-white font-semibold text-sm leading-tight tracking-wide">CraftMen</p>
+            <p className="text-green-200/90 text-xs leading-tight">Ausschreibungsplattform</p>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1.5">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
@@ -44,10 +36,10 @@ export default function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
                 active
-                  ? "bg-green-700 text-white"
-                  : "text-green-300 hover:bg-green-800 hover:text-white"
+                  ? "bg-white/15 text-white shadow-sm"
+                  : "text-green-100/90 hover:bg-white/10 hover:text-white"
               )}
             >
               <Icon className="w-4 h-4" />
@@ -57,8 +49,16 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-4 border-t border-green-800">
+      <div className="px-4 pb-4">
+        <div className="rounded-xl border border-white/15 bg-white/5 p-3">
+          <p className="flex items-center gap-2 text-xs text-green-100 font-medium">
+            <Sparkles className="w-3.5 h-3.5" />
+            Tipp für schnelleres Arbeiten
+          </p>
+          <p className="mt-1.5 text-xs text-green-100/80 leading-relaxed">
+            Öffne ein Projekt und versende Anfragen direkt an mehrere Lieferanten gleichzeitig.
+          </p>
+        </div>
       </div>
     </aside>
   );
