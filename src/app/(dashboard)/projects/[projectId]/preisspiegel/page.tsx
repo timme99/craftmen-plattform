@@ -68,6 +68,7 @@ export default async function PreisspiegelPage({ params }: Props) {
   });
 
   const missingPositions = coverageByPosition.filter((c) => c.missingCount > 0);
+  const criticalMissingPositions = coverageByPosition.filter((c) => c.coveragePercent < 50).length;
   const coverageMap = Object.fromEntries(coverageByPosition.map((c) => [c.positionId, c.coveragePercent]));
 
   const outlierWarnings = positions.flatMap((pos) => {
@@ -84,6 +85,7 @@ export default async function PreisspiegelPage({ params }: Props) {
       .filter((p) => p.value > median * 1.35)
       .map((p) => ({ positionNumber: pos.positionNumber, supplier: p.supplier, deltaPct: Math.round(((p.value / median) - 1) * 100) }));
   });
+  const strongestOutliers = [...outlierWarnings].sort((a, b) => b.deltaPct - a.deltaPct).slice(0, 3);
 
   // Find cheapest supplier per position
   const cheapestByPosition: Record<string, string> = {};
@@ -124,6 +126,20 @@ export default async function PreisspiegelPage({ params }: Props) {
             <p>
               Preis-Ausreißer erkannt: <strong>{outlierWarnings.length}</strong> Positionen liegen über 35% über dem Median.
             </p>
+          )}
+          {criticalMissingPositions > 0 && (
+            <p>
+              Kritisch unvollständig: <strong>{criticalMissingPositions}</strong> Positionen haben weniger als 50% Preisabdeckung.
+            </p>
+          )}
+          {strongestOutliers.length > 0 && (
+            <ul className="list-disc ml-4">
+              {strongestOutliers.map((warn) => (
+                <li key={`${warn.positionNumber}-${warn.supplier}`}>
+                  Pos. {warn.positionNumber}: {warn.supplier} liegt {warn.deltaPct}% über Median.
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}
