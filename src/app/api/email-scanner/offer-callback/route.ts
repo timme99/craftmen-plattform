@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
+import { safeEqualString } from "@/lib/security";
 
 const callbackSchema = z.object({
   inquiryId: z.string().uuid(),
@@ -26,7 +27,7 @@ const callbackSchema = z.object({
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
-  if (body.secret !== process.env.PDF_SERVICE_SECRET) {
+  if (!body.secret || !process.env.PDF_SERVICE_SECRET || !safeEqualString(body.secret, process.env.PDF_SERVICE_SECRET)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

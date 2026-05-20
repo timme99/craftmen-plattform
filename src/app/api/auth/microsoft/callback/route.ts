@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
+import { safeEqualString } from "@/lib/security";
+
+const OAUTH_STATE_COOKIE = "ms_oauth_state";
 
 export async function GET(req: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
@@ -11,9 +14,19 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
     const code = searchParams.get("code");
+    const state = searchParams.get("state");
+    const stateCookie = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
+
+    if (!state || !stateCookie || !safeEqualString(state, stateCookie)) {
+      const response = NextResponse.redirect(`${baseUrl}/settings?error=invalid_state`);
+      response.cookies.delete(OAUTH_STATE_COOKIE);
+      return response;
+    }
 
     if (!code) {
-      return NextResponse.redirect(`${baseUrl}/settings?error=no_code`);
+      const response = NextResponse.redirect(`${baseUrl}/settings?error=no_code`);
+      response.cookies.delete(OAUTH_STATE_COOKIE);
+      return response;
     }
 
     const clientId = process.env.MICROSOFT_CLIENT_ID!;
@@ -39,7 +52,9 @@ export async function GET(req: NextRequest) {
     if (!tokenRes.ok) {
       const errBody = await tokenRes.text();
       console.error("[microsoft/callback] token exchange failed:", tokenRes.status, errBody);
-      return NextResponse.redirect(`${baseUrl}/settings?error=token_exchange`);
+      const response = NextResponse.redirect(`${baseUrl}/settings?error=token_exchange`);
+      response.cookies.delete(OAUTH_STATE_COOKIE);
+      return response;
     }
 
     const tokens = await tokenRes.json();
@@ -71,9 +86,13 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(`${baseUrl}/settings?success=connected`);
+    const response = NextResponse.redirect(`${baseUrl}/settings?success=connected`);
+    response.cookies.delete(OAUTH_STATE_COOKIE);
+    return response;
   } catch (err) {
     console.error("[microsoft/callback] error:", err);
-    return NextResponse.redirect(`${baseUrl}/settings?error=unknown`);
+    const response = NextResponse.redirect(`${baseUrl}/settings?error=unknown`);
+    response.cookies.delete(OAUTH_STATE_COOKIE);
+    return response;
   }
 }

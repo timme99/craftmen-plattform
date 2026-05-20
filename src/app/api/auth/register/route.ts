@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 const schema = z.object({
   companyName: z.string().min(2),
   email: z.string().email(),
-  supabaseId: z.string().uuid(),
 });
 
 function toSlug(name: string) {
@@ -24,7 +24,18 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
     }
-    const { companyName, email, supabaseId } = parsed.data;
+    const { companyName, email } = parsed.data;
+
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+    }
+
+    const supabaseId = user.id;
+    if (user.email?.toLowerCase() !== email.toLowerCase()) {
+      return NextResponse.json({ error: "E-Mail passt nicht zur Sitzung" }, { status: 400 });
+    }
 
     const admin = createAdminClient();
 
@@ -58,15 +69,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Tenant-Erstellung fehlgeschlagen" }, { status: 500 });
     }
 
-    const { error: userError } = await admin.from("users").insert({
+    const { error: insertUserError } = await admin.from("users").insert({
       tenantId: tenant.id,
       supabaseId,
       email,
       role: "OWNER",
     });
 
-    if (userError) {
-      console.error(userError);
+    if (insertUserError) {
+      console.error(insertUserError);
       await admin.from("tenants").delete().eq("id", tenant.id);
       return NextResponse.json({ error: "Nutzer-Erstellung fehlgeschlagen" }, { status: 500 });
     }

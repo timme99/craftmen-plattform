@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requireTenant } from "@/lib/utils/tenant";
 import { sendInquiryEmail } from "@/lib/graph/client";
+import { escapeHtml } from "@/lib/security";
 
 const createInquirySchema = z.object({
   projectId: z.string().uuid(),
@@ -113,11 +114,11 @@ function buildEmailHtml(params: {
         <h1 style="color: white; margin: 0; font-size: 22px;">CraftMen Plattform</h1>
       </div>
       <div style="padding: 30px; background: #ffffff;">
-        <p>Sehr geehrte Damen und Herren von <strong>${params.supplierName}</strong>,</p>
+        <p>Sehr geehrte Damen und Herren von <strong>${escapeHtml(params.supplierName)}</strong>,</p>
         <p>wir laden Sie ein, ein Angebot für das folgende Projekt abzugeben:</p>
-        <p style="font-size: 18px; font-weight: bold; color: #2D6A4F;">${params.projectName}</p>
+        <p style="font-size: 18px; font-weight: bold; color: #2D6A4F;">${escapeHtml(params.projectName)}</p>
         ${deadlineText}
-        ${params.customMessage ? `<p>${params.customMessage}</p>` : ""}
+        ${params.customMessage ? `<p>${escapeHtml(params.customMessage)}</p>` : ""}
         <p>Bitte klicken Sie auf den folgenden Button, um Ihr Angebot direkt einzugeben:</p>
         <a href="${params.portalUrl}" style="display: inline-block; background: #2D6A4F; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 16px 0;">
           Angebot abgeben →

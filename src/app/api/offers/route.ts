@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const submitOfferSchema = z.object({
   inquiryId: z.string().uuid(),
@@ -20,6 +21,11 @@ const submitOfferSchema = z.object({
 // Public route — suppliers submit via portal token (no auth required)
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    if (!checkRateLimit(`offers:${ip}`)) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const body = await req.json();
     const validated = submitOfferSchema.parse(body);
 
@@ -39,6 +45,10 @@ export async function POST(req: NextRequest) {
 
     if (!inquiry) {
       return NextResponse.json({ error: "Invalid token" }, { status: 404 });
+    }
+
+    if (!checkRateLimit(`offers:${ip}:${inquiry.id}`)) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
     if (inquiry.status === "EXPIRED" || inquiry.status === "DECLINED") {
