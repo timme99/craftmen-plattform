@@ -76,6 +76,29 @@ export async function POST(req: NextRequest) {
     if (offerItems.length > 0) {
       await prisma.offerItem.createMany({ data: offerItems, skipDuplicates: true });
     }
+
+    const matchedCount = offerItems.length;
+    const extractedCount = validated.positions.length;
+    const matchRate = extractedCount > 0 ? Math.round((matchedCount / extractedCount) * 100) : 0;
+    const confidenceLabel = matchRate >= 90 ? "HOCH" : matchRate >= 60 ? "MITTEL" : "NIEDRIG";
+
+    await prisma.offer.update({
+      where: { id: offer.id },
+      data: {
+        notes: `Import-Qualität: ${confidenceLabel} (${matchedCount}/${extractedCount} Positionen gematcht, ${matchRate}%)`,
+      },
+    });
+
+    await prisma.inquiry.update({
+      where: { id: inquiry.id },
+      data: {
+        status: "OFFER_RECEIVED",
+        notes:
+          matchRate < 60
+            ? `⚠️ Geringe Import-Qualität beim E-Mail-Angebot (${matchedCount}/${extractedCount}, ${matchRate}%). Bitte prüfen.`
+            : `Import-Qualität: ${confidenceLabel} (${matchedCount}/${extractedCount}, ${matchRate}%).`,
+      },
+    });
   }
 
   return NextResponse.json({ ok: true });
