@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
   const lvPositions = inquiry.project.leistungsverzeichnis[0]?.positions ?? [];
   if (validated.success && validated.positions && lvPositions.length > 0) {
     const positionMap = new Map(lvPositions.map((p) => [p.positionNumber, p.id]));
-    const offerItems = validated.positions
-      .filter((p) => positionMap.has(p.positionNumber))
-      .map((p) => ({
+    const matchedPositions = validated.positions.filter((p) => positionMap.has(p.positionNumber));
+    const unmatchedPositions = validated.positions.filter((p) => !positionMap.has(p.positionNumber));
+    const offerItems = matchedPositions.map((p) => ({
         offerId: offer.id,
         positionId: positionMap.get(p.positionNumber)!,
       }));
@@ -77,15 +77,16 @@ export async function POST(req: NextRequest) {
       await prisma.offerItem.createMany({ data: offerItems, skipDuplicates: true });
     }
 
-    const matchedCount = offerItems.length;
+    const matchedCount = matchedPositions.length;
     const extractedCount = validated.positions.length;
     const matchRate = extractedCount > 0 ? Math.round((matchedCount / extractedCount) * 100) : 0;
-    const confidenceLabel = matchRate >= 90 ? "HOCH" : matchRate >= 60 ? "MITTEL" : "NIEDRIG";
+    const confidenceLabel = matchRate >= 90 ? "SICHER" : matchRate >= 60 ? "PRUEFEN" : "UNKLAR";
+    const unmatchedPreview = unmatchedPositions.slice(0, 5).map((p) => p.positionNumber).join(", ");
 
     await prisma.offer.update({
       where: { id: offer.id },
       data: {
-        notes: `Import-Qualität: ${confidenceLabel} (${matchedCount}/${extractedCount} Positionen gematcht, ${matchRate}%)`,
+        notes: `Import-Qualität: ${confidenceLabel} (${matchedCount}/${extractedCount} Positionen gematcht, ${matchRate}%).`,
       },
     });
 
@@ -95,8 +96,8 @@ export async function POST(req: NextRequest) {
         status: "OFFER_RECEIVED",
         notes:
           matchRate < 60
-            ? `⚠️ Geringe Import-Qualität beim E-Mail-Angebot (${matchedCount}/${extractedCount}, ${matchRate}%). Bitte prüfen.`
-            : `Import-Qualität: ${confidenceLabel} (${matchedCount}/${extractedCount}, ${matchRate}%).`,
+            ? `⚠️ Import-Ampel: UNKLAR (${matchedCount}/${extractedCount}, ${matchRate}%). Fehlende Zuordnung: ${unmatchedPositions.length}${unmatchedPreview ? ` | Beispiele: ${unmatchedPreview}` : ""}. Bitte manuell prüfen.`
+            : `Import-Ampel: ${confidenceLabel} (${matchedCount}/${extractedCount}, ${matchRate}%). Fehlende Zuordnung: ${unmatchedPositions.length}${unmatchedPreview ? ` | Beispiele: ${unmatchedPreview}` : ""}.`,
       },
     });
   }
