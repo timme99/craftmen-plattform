@@ -21,13 +21,16 @@ export default async function ProjectsPage() {
     }),
   ]);
 
+  const totalInquiries = projects.reduce((sum, project) => sum + project._count.inquiries, 0);
+  const totalLv = projects.reduce((sum, project) => sum + project._count.leistungsverzeichnis, 0);
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Projekte</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Projekte</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {projects.length} {projects.length === 1 ? "Projekt" : "Projekte"}
+            Übersicht über alle aktiven Ausschreibungen und Anfragen.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -36,24 +39,34 @@ export default async function ProjectsPage() {
         </div>
       </div>
 
-      {/* Email connection hint */}
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+          <p className="text-xs uppercase tracking-wide text-gray-500">Projekte</p>
+          <p className="text-2xl font-semibold text-gray-900 mt-1">{projects.length}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+          <p className="text-xs uppercase tracking-wide text-gray-500">Anfragen gesamt</p>
+          <p className="text-2xl font-semibold text-gray-900 mt-1">{totalInquiries}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+          <p className="text-xs uppercase tracking-wide text-gray-500">LV-Positionen</p>
+          <p className="text-2xl font-semibold text-gray-900 mt-1">{totalLv}</p>
+        </div>
+      </section>
+
       {!emailConn && (
-        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-800 flex items-center gap-2">
-          <span>⚠️</span>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-900 flex items-start gap-2.5">
+          <span aria-hidden>⚠️</span>
           <span>
-            Noch kein Outlook-Konto verbunden.{" "}
-            <a href="/settings" className="font-medium underline">
-              Jetzt unter Einstellungen verbinden
-            </a>{" "}
-            um E-Mails automatisch zu senden und zu empfangen.
+            Noch kein Outlook-Konto verbunden. <a href="/settings" className="font-semibold underline">Jetzt verbinden</a>, um E-Mails automatisch zu senden und zu empfangen.
           </span>
         </div>
       )}
 
       {projects.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
-          <p className="text-lg font-medium">Noch keine Projekte</p>
-          <p className="text-sm mt-1">Lege dein erstes Projekt an, um zu starten.</p>
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white text-center py-20 px-6 text-gray-500">
+          <p className="text-lg font-semibold text-gray-800">Noch keine Projekte</p>
+          <p className="text-sm mt-1">Lege dein erstes Projekt an, um Ausschreibungen zentral zu steuern.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
