@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma/client";
 import EmailScannerButton from "@/components/forms/EmailScannerButton";
 import SendInquiryButton from "@/components/forms/SendInquiryButton";
 import OfferDetailModal from "@/components/dashboard/OfferDetailModal";
-import { Send, Clock, CheckCircle, X, Users } from "lucide-react";
+import { Users } from "lucide-react";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -30,6 +30,16 @@ const statusColors: Record<string, string> = {
 
 const fmt = (val: { toString(): string } | null | undefined) =>
   val != null ? Number(val.toString()).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+
+function getDeadlinePhase(deadline: Date | null) {
+  if (!deadline) return { label: "Keine Frist", color: "text-gray-400" };
+  const daysLeft = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (daysLeft < 0) return { label: `Überfällig (${Math.abs(daysLeft)} Tage)`, color: "text-red-700" };
+  if (daysLeft <= 1) return { label: "Eskalation: heute/morgen", color: "text-red-700" };
+  if (daysLeft <= 3) return { label: "Reminder: 3 Tage", color: "text-amber-700" };
+  if (daysLeft <= 7) return { label: "Vorwarnung: 7 Tage", color: "text-blue-700" };
+  return { label: `Noch ${daysLeft} Tage`, color: "text-gray-500" };
+}
 
 export default async function AnfragenPage({ params }: Props) {
   const { projectId } = await params;
@@ -74,6 +84,11 @@ export default async function AnfragenPage({ params }: Props) {
         </div>
       </div>
 
+      <div className="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-700">
+        <p className="font-semibold text-gray-900 mb-2">Reminder-Timeline</p>
+        <p>Automatische Staffelung: Vorwarnung 7 Tage vor Frist, Reminder 3 Tage vor Frist, Eskalation 1 Tag vor Frist bzw. am Fristtag.</p>
+      </div>
+
       {inquiries.length === 0 ? (
         <div className="text-center py-20 text-gray-400 bg-white rounded-xl border border-gray-200">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -112,6 +127,7 @@ export default async function AnfragenPage({ params }: Props) {
                     </td>
                     <td className="px-4 py-3.5 hidden lg:table-cell text-gray-500">
                       {inq.deadline ? new Date(inq.deadline).toLocaleDateString("de-DE") : "—"}
+                      <p className={`text-xs mt-0.5 ${getDeadlinePhase(inq.deadline).color}`}>{getDeadlinePhase(inq.deadline).label}</p>
                     </td>
                     <td className="px-4 py-3.5 hidden md:table-cell text-right font-medium text-gray-900">
                       {offer?.totalNet ? `${fmt(offer.totalNet)} €` : "—"}

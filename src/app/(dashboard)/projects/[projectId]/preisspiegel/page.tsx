@@ -57,6 +57,34 @@ export default async function PreisspiegelPage({ params }: Props) {
 
   const totalInquiries = project.inquiries.length;
 
+  const coverageByPosition = positions.map((pos) => {
+    const offeredCount = suppliers.filter((sup) => sup.items[pos.id]?.totalPrice != null).length;
+    return {
+      positionId: pos.id,
+      offeredCount,
+      missingCount: suppliers.length - offeredCount,
+      coveragePercent: suppliers.length > 0 ? Math.round((offeredCount / suppliers.length) * 100) : 0,
+    };
+  });
+
+  const missingPositions = coverageByPosition.filter((c) => c.missingCount > 0);
+  const coverageMap = Object.fromEntries(coverageByPosition.map((c) => [c.positionId, c.coveragePercent]));
+
+  const outlierWarnings = positions.flatMap((pos) => {
+    const prices = suppliers
+      .map((sup) => ({ supplier: sup.companyName, value: sup.items[pos.id]?.totalPrice }))
+      .filter((p): p is { supplier: string; value: string } => p.value != null)
+      .map((p) => ({ supplier: p.supplier, value: Number(p.value) }))
+      .filter((p) => Number.isFinite(p.value) && p.value > 0);
+
+    if (prices.length < 3) return [];
+    const sorted = [...prices].sort((a, b) => a.value - b.value);
+    const median = sorted[Math.floor(sorted.length / 2)].value;
+    return prices
+      .filter((p) => p.value > median * 1.35)
+      .map((p) => ({ positionNumber: pos.positionNumber, supplier: p.supplier, deltaPct: Math.round(((p.value / median) - 1) * 100) }));
+  });
+
   // Find cheapest supplier per position
   const cheapestByPosition: Record<string, string> = {};
   for (const pos of positions) {
@@ -83,6 +111,22 @@ export default async function PreisspiegelPage({ params }: Props) {
         </div>
         {suppliers.length > 0 && <ExportPreisspiegelButton projectId={project.id} />}
       </div>
+
+      {(missingPositions.length > 0 || outlierWarnings.length > 0) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900 space-y-2">
+          <p className="font-semibold">Automatische Qualitätswarnungen</p>
+          {missingPositions.length > 0 && (
+            <p>
+              Fehlende Positionspreise: <strong>{missingPositions.length}</strong> von {positions.length} Positionen sind nicht vollständig bepreist.
+            </p>
+          )}
+          {outlierWarnings.length > 0 && (
+            <p>
+              Preis-Ausreißer erkannt: <strong>{outlierWarnings.length}</strong> Positionen liegen über 35% über dem Median.
+            </p>
+          )}
+        </div>
+      )}
 
       {suppliers.length === 0 ? (
         <div className="text-center py-20 text-gray-400 bg-white rounded-xl border border-gray-200">
@@ -123,7 +167,12 @@ export default async function PreisspiegelPage({ params }: Props) {
               {positions.map((pos) => (
                 <tr key={pos.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5 text-xs text-gray-400 font-mono sticky left-0 bg-white">{pos.positionNumber}</td>
-                  <td className="px-4 py-2.5 text-gray-800 sticky left-16 bg-white">{pos.shortText}</td>
+                  <td className="px-4 py-2.5 text-gray-800 sticky left-16 bg-white">
+                    {pos.shortText}
+                    {(coverageMap[pos.id] ?? 100) < 100 && (
+                      <span className="ml-2 text-[11px] text-amber-700">({coverageMap[pos.id]}% Abdeckung)</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-right text-gray-500">{pos.unit ?? "—"}</td>
                   <td className="px-3 py-2.5 text-right text-gray-600">{pos.quantity ? Number(pos.quantity).toLocaleString("de-DE") : "—"}</td>
                   {suppliers.map((sup) => {
