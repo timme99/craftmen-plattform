@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requireTenant } from "@/lib/utils/tenant";
+import { logAudit } from "@/lib/audit";
 
 const createProjectSchema = z.object({
   name: z.string().min(2).max(100),
@@ -31,6 +32,10 @@ export async function POST(req: NextRequest) {
 
     const project = await prisma.project.create({
       data: { ...validated, tenantId: user.tenantId },
+    });
+
+    await logAudit(user.tenantId, user.id, "PROJECT_CREATED", "Project", project.id, {
+      name: project.name,
     });
 
     return NextResponse.json({ data: project }, { status: 201 });

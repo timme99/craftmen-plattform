@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma/client";
 import ProjectCard from "@/components/dashboard/ProjectCard";
 import CreateProjectButton from "@/components/forms/CreateProjectButton";
 import EmailScannerButton from "@/components/forms/EmailScannerButton";
+import { DashboardBriefing } from "@/components/dashboard/DashboardBriefing";
 
 export default async function ProjectsPage() {
   const user = await requireTenant();
@@ -26,6 +27,7 @@ export default async function ProjectsPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardBriefing />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Projekte</h1>

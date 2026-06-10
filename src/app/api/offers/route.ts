@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 const submitOfferSchema = z.object({
   inquiryId: z.string().uuid(),
@@ -71,6 +72,8 @@ export async function POST(req: NextRequest) {
           unitPrice: item.unitPrice,
           totalPrice,
           notes: item.notes,
+          matchConfidence: 1.0,
+          matchType: "exact",
         };
       });
 
@@ -105,6 +108,13 @@ export async function POST(req: NextRequest) {
       });
 
       return newOffer;
+    });
+
+    await logAudit(inquiry.tenantId, undefined, "OFFER_SUBMITTED", "Offer", offer.id, {
+      source: "PORTAL",
+      inquiryId: inquiry.id,
+      totalNet,
+      totalGross,
     });
 
     return NextResponse.json({ data: offer }, { status: 201 });
