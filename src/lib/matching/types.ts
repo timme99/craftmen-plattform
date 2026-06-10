@@ -9,9 +9,9 @@ export interface LvPosition {
 export interface ExtractedPos {
   positionNumber: string;
   shortText: string;
-  unitPrice?: number;
-  totalPrice?: number;
-  notes?: string;
+  unitPrice?: number | null;
+  totalPrice?: number | null;
+  notes?: string | null;
 }
 
 export interface MatchResult {

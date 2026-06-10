@@ -14,13 +14,14 @@ const callbackSchema = z.object({
       z.object({
         positionNumber: z.string(),
         shortText: z.string(),
-        longText: z.string().optional(),
-        unit: z.string().optional(),
-        quantity: z.number().optional(),
-        trade: z.string().optional(),
+        // Python service serializes empty fields as null, not undefined
+        longText: z.string().nullish(),
+        unit: z.string().nullish(),
+        quantity: z.number().nullish(),
+        trade: z.string().nullish(),
         sortOrder: z.number(),
-        unitPrice: z.number().optional(),
-        totalPrice: z.number().optional(),
+        unitPrice: z.number().nullish(),
+        totalPrice: z.number().nullish(),
       })
     )
     .optional(),

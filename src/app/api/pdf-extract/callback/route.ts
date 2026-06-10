@@ -12,10 +12,11 @@ const callbackSchema = z.object({
       z.object({
         positionNumber: z.string(),
         shortText: z.string(),
-        longText: z.string().optional(),
-        unit: z.string().optional(),
-        quantity: z.number().optional(),
-        trade: z.string().optional(),
+        // Python service serializes empty fields as null, not undefined
+        longText: z.string().nullish(),
+        unit: z.string().nullish(),
+        quantity: z.number().nullish(),
+        trade: z.string().nullish(),
         sortOrder: z.number(),
       })
     )
@@ -31,7 +32,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const validated = callbackSchema.parse(body);
+  const parsed = callbackSchema.safeParse(body);
+  if (!parsed.success) {
+    // Mark the LV as failed so it doesn't stay in PROCESSING forever
+    if (typeof body.lvId === "string") {
+      await prisma.leistungsverzeichnis
+        .update({
+          where: { id: body.lvId },
+          data: {
+            extractionStatus: "FAILED",
+            errorMessage: `Ungültiges Callback-Format: ${parsed.error.message.slice(0, 500)}`,
+          },
+        })
+        .catch(() => {});
+    }
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+  const validated = parsed.data;
 
   if (!validated.success || !validated.positions) {
     await prisma.leistungsverzeichnis.update({
