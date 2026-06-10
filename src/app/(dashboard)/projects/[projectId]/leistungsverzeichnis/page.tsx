@@ -3,6 +3,7 @@ import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import UploadLvButton from "@/components/forms/UploadLvButton";
 import DeleteLvButton from "@/components/forms/DeleteLvButton";
+import EditablePositionRow from "@/components/forms/EditablePositionRow";
 import AddPositionForm from "@/components/forms/AddPositionForm";
 import { FileText, ChevronDown } from "lucide-react";
 
@@ -104,14 +105,16 @@ export default async function PositionenPage({ params }: Props) {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {lv.positions.map((pos) => (
-                          <tr key={pos.id} className="hover:bg-gray-50">
-                            <td className="py-2 pr-4 text-gray-500 font-mono text-xs">{pos.positionNumber}</td>
-                            <td className="py-2 pr-4 text-gray-900">{pos.shortText}</td>
-                            <td className="py-2 pr-4 text-right text-gray-500">{pos.unit ?? "—"}</td>
-                            <td className="py-2 text-right text-gray-700 font-medium">
-                              {pos.quantity != null ? Number(pos.quantity).toLocaleString("de-DE") : "—"}
-                            </td>
-                          </tr>
+                          <EditablePositionRow
+                            key={pos.id}
+                            position={{
+                              id: pos.id,
+                              positionNumber: pos.positionNumber,
+                              shortText: pos.shortText,
+                              unit: pos.unit,
+                              quantity: pos.quantity != null ? Number(pos.quantity) : null,
+                            }}
+                          />
                         ))}
                       </tbody>
                     </table>
