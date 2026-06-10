@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma/client";
 import { requireTenant } from "@/lib/utils/tenant";
 import { sendInquiryEmail } from "@/lib/graph/client";
 import { escapeHtml } from "@/lib/security";
+import { logAudit } from "@/lib/audit";
 
 const createInquirySchema = z.object({
   projectId: z.string().uuid(),
@@ -74,6 +75,11 @@ export async function POST(req: NextRequest) {
           await prisma.inquiry.update({
             where: { id: inquiry.id },
             data: { status: "SENT", sentAt: new Date() },
+          });
+
+          await logAudit(user.tenantId, user.id, "INQUIRY_SENT", "Inquiry", inquiry.id, {
+            supplierId: inquiry.supplierId,
+            projectId: validated.projectId,
           });
         })
       );

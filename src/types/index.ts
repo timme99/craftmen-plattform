@@ -12,6 +12,12 @@ export type {
   PriceComparison,
   Subscription,
   AuditLog,
+  PriceAnomaly,
+  SupplierScore,
+  Invoice,
+  InvoiceItem,
+  InquiryTemplate,
+  BenchmarkEntry,
   Plan,
   UserRole,
   ProjectStatus,
@@ -58,4 +64,37 @@ export interface InquiryEmailParams {
   portalUrl: string;
   deadline?: Date;
   customMessage?: string;
+}
+
+export type CopilotItemType =
+  | "EXPIRING_INQUIRY"
+  | "UNKLAR_MATCH"
+  | "MISSING_OFFER"
+  | "STALLED_PROJECT"
+  | "PRICE_ANOMALY";
+
+export interface CopilotItem {
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  type: CopilotItemType;
+  title: string;
+  description: string;
+  actionUrl: string;
+  entityId: string;
+}
+
+export interface BenchmarkBand {
+  unitPriceMin: number;
+  unitPriceP25: number;
+  unitPriceMed: number;
+  unitPriceP75: number;
+  unitPriceMax: number;
+  sampleCount: number;
+}
+
+export type MatchType = "exact" | "semantic" | "unmatched";
+
+export interface MatchResult {
+  positionId: string | null;
+  confidence: number;
+  matchType: MatchType;
 }

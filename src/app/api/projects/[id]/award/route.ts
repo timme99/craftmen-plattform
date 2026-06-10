@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import { sendInquiryEmail } from "@/lib/graph/client";
+import { logAudit } from "@/lib/audit";
 
 export const maxDuration = 10;
 
@@ -60,6 +61,12 @@ export async function POST(req: NextRequest, { params }: Params) {
           },
         });
       }
+    });
+
+    await logAudit(user.tenantId, user.id, "PROJECT_AWARDED", "Project", projectId, {
+      winningInquiryId,
+      decisionNote,
+      totalInquiries: inquiries.length,
     });
 
     if (!notifySuppliers) {

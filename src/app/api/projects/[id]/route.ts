@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import { z } from "zod";
+import { logAudit } from "@/lib/audit";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -33,6 +34,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       where: { id },
       data: parsed.data,
     });
+
+    if (parsed.data.status && parsed.data.status !== project.status) {
+      await logAudit(user.tenantId, user.id, "PROJECT_STATUS_CHANGED", "Project", id, {
+        from: project.status,
+        to: parsed.data.status,
+      });
+    }
 
     return NextResponse.json(updated);
   } catch (err) {

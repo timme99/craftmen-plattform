@@ -10,10 +10,12 @@ interface Props {
 }
 
 const tabs = [
-  { label: "Übersicht",  suffix: "" },
-  { label: "Positionen", suffix: "/leistungsverzeichnis" },
-  { label: "Anfragen",   suffix: "/inquiries" },
+  { label: "Übersicht",    suffix: "" },
+  { label: "Positionen",   suffix: "/leistungsverzeichnis" },
+  { label: "Anfragen",     suffix: "/inquiries" },
   { label: "Preisspiegel", suffix: "/preisspiegel" },
+  { label: "Rechnungen",   suffix: "/rechnungen" },
+  { label: "Chronik",      suffix: "/chronik" },
 ];
 
 export default function ProjectLayout({ children, params }: Props) {
