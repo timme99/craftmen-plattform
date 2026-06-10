@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import UploadLvButton from "@/components/forms/UploadLvButton";
+import DeleteLvButton from "@/components/forms/DeleteLvButton";
 import AddPositionForm from "@/components/forms/AddPositionForm";
 import { FileText, ChevronDown } from "lucide-react";
 
@@ -78,6 +79,7 @@ export default async function PositionenPage({ params }: Props) {
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[lv.extractionStatus] ?? "bg-gray-100 text-gray-600"}`}>
                     {statusLabels[lv.extractionStatus] ?? lv.extractionStatus}
                   </span>
+                  <DeleteLvButton lvId={lv.id} fileName={lv.fileName} />
                   <ChevronDown className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" />
                 </div>
               </summary>
