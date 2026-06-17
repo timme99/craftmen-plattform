@@ -3,6 +3,7 @@ import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import EmailScannerButton from "@/components/forms/EmailScannerButton";
 import SendInquiryButton from "@/components/forms/SendInquiryButton";
+import PositionAssignmentPanel from "@/components/forms/PositionAssignmentPanel";
 import OfferDetailModal from "@/components/dashboard/OfferDetailModal";
 import { Users } from "lucide-react";
 
@@ -52,9 +53,16 @@ export default async function AnfragenPage({ params }: Props) {
         inquiries: {
           include: {
             supplier: true,
+            positions: { include: { position: true } },
             offers: { orderBy: { createdAt: "desc" }, take: 1 },
           },
           orderBy: { createdAt: "desc" },
+        },
+        leistungsverzeichnis: {
+          where: { extractionStatus: "COMPLETED" },
+          include: { positions: { orderBy: { sortOrder: "asc" } } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
         },
       },
     }),
@@ -68,6 +76,16 @@ export default async function AnfragenPage({ params }: Props) {
 
   const inquiries = project.inquiries;
   const received = inquiries.filter((i) => i.status === "OFFER_RECEIVED").length;
+  const positions = (project.leistungsverzeichnis[0]?.positions ?? []).map((position) => ({
+    id: position.id,
+    positionNumber: position.positionNumber,
+    shortText: position.shortText,
+    quantity: position.quantity?.toString() ?? null,
+    unit: position.unit,
+    assignedSuppliers: inquiries
+      .filter((inquiry) => inquiry.positions.some((assignment) => assignment.positionId === position.id))
+      .map((inquiry) => ({ id: inquiry.supplier.id, companyName: inquiry.supplier.companyName })),
+  }));
 
   return (
     <div className="space-y-5">
@@ -83,6 +101,8 @@ export default async function AnfragenPage({ params }: Props) {
           <SendInquiryButton projectId={project.id} suppliers={allSuppliers} />
         </div>
       </div>
+
+      <PositionAssignmentPanel projectId={project.id} positions={positions} suppliers={allSuppliers} />
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-700">
         <p className="font-semibold text-gray-900 mb-2">Reminder-Timeline</p>

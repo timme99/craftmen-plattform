@@ -130,6 +130,7 @@ model Position {
 
   leistungsverzeichnis Leistungsverzeichnis @relation(fields: [leistungsverzeichnisId], references: [id], onDelete: Cascade)
   offerItems           OfferItem[]
+  inquiryPositions     InquiryPosition[]
   priceAnomalies       PriceAnomaly[]
   invoiceItems         InvoiceItem[]
 
@@ -177,11 +178,27 @@ model Inquiry {
 
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   supplier Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  offers   Offer[]
-  invoices Invoice[]
+  offers    Offer[]
+  invoices  Invoice[]
+  positions InquiryPosition[]
 
   @@unique([projectId, supplierId])
   @@map("inquiries")
+}
+
+
+model InquiryPosition {
+  id         String   @id @default(uuid())
+  inquiryId  String
+  positionId String
+  createdAt  DateTime @default(now())
+
+  inquiry  Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@unique([inquiryId, positionId])
+  @@index([positionId])
+  @@map("inquiry_positions")
 }
 
 enum InquiryStatus {
