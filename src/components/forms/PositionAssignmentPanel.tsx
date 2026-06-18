@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, Link2 } from "lucide-react";
+import { CheckSquare, Link2, Sparkles } from "lucide-react";
 
 type Supplier = {
   id: string;
@@ -24,19 +24,32 @@ type Position = {
   assignedSuppliers: AssignedSupplier[];
 };
 
+type Suggestion = {
+  positionId: string;
+  suggestedSupplierIds: string[];
+  reason: string;
+  confidence: number;
+};
+
 interface Props {
   projectId: string;
   positions: Position[];
   suppliers: Supplier[];
+  aiEnabled?: boolean;
 }
 
-export default function PositionAssignmentPanel({ projectId, positions, suppliers }: Props) {
+export default function PositionAssignmentPanel({ projectId, positions, suppliers, aiEnabled = false }: Props) {
   const router = useRouter();
   const [selectedPositionIds, setSelectedPositionIds] = useState<string[]>([]);
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
   const [localPositions, setLocalPositions] = useState(positions);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
+  const positionsById = useMemo(() => new Map(localPositions.map((p) => [p.id, p])), [localPositions]);
+  const suppliersById = useMemo(() => new Map(suppliers.map((s) => [s.id, s])), [suppliers]);
 
   const unassignedPositions = useMemo(
     () => localPositions.filter((position) => position.assignedSuppliers.length === 0),
@@ -49,8 +62,27 @@ export default function PositionAssignmentPanel({ projectId, positions, supplier
     );
   }
 
-  async function assignPositions(positionIds: string[]) {
-    if (!supplierId) {
+  async function fetchSuggestions() {
+    setAiLoading(true);
+    setError("");
+    const res = await fetch("/api/ai/assign-positions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId }),
+    });
+    setAiLoading(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(typeof body.error === "string" ? body.error : "KI-Vorschläge fehlgeschlagen.");
+      return;
+    }
+    const body = (await res.json()) as { data: { suggestions: Suggestion[] } };
+    setSuggestions(body.data.suggestions);
+  }
+
+  async function assignPositions(positionIds: string[], overrideSupplierId?: string) {
+    const targetSupplier = overrideSupplierId ?? supplierId;
+    if (!targetSupplier) {
       setError("Bitte einen Lieferanten auswählen.");
       return;
     }
@@ -65,7 +97,7 @@ export default function PositionAssignmentPanel({ projectId, positions, supplier
     const res = await fetch(`/api/projects/${projectId}/inquiries/assign-positions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ supplierId, positionIds }),
+      body: JSON.stringify({ supplierId: targetSupplier, positionIds }),
     });
 
     setLoading(false);
@@ -103,6 +135,17 @@ export default function PositionAssignmentPanel({ projectId, positions, supplier
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          {aiEnabled && (
+            <button
+              type="button"
+              onClick={fetchSuggestions}
+              disabled={aiLoading || localPositions.length === 0 || suppliers.length === 0}
+              className="inline-flex items-center justify-center gap-2 border border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50 text-sm font-medium px-3 py-2 rounded-lg"
+            >
+              <Sparkles className="w-4 h-4" />
+              {aiLoading ? "Analysiert…" : "KI-Zuordnung vorschlagen"}
+            </button>
+          )}
           <select
             value={supplierId}
             onChange={(event) => setSupplierId(event.target.value)}
@@ -136,6 +179,56 @@ export default function PositionAssignmentPanel({ projectId, positions, supplier
       </div>
 
       {error && <p className="m-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+
+      {suggestions.length > 0 && (
+        <div className="m-4 border border-green-200 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between bg-green-50 px-4 py-2">
+            <p className="text-sm font-semibold text-green-800 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> KI-Zuordnungsvorschläge
+            </p>
+            <button onClick={() => setSuggestions([])} className="text-xs text-green-700 hover:text-green-900">
+              Schließen
+            </button>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {suggestions.map((suggestion) => {
+              const position = positionsById.get(suggestion.positionId);
+              const topSupplierId = suggestion.suggestedSupplierIds[0];
+              const supplierNames = suggestion.suggestedSupplierIds
+                .map((id) => suppliersById.get(id)?.companyName)
+                .filter(Boolean)
+                .join(", ");
+              if (!position || !topSupplierId) return null;
+              return (
+                <li key={suggestion.positionId} className="flex items-start justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      {position.positionNumber} · {position.shortText}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      → {supplierNames}{" "}
+                      <span className="text-gray-400">({Math.round(suggestion.confidence * 100)}%)</span>
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">{suggestion.reason}</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={async () => {
+                      await assignPositions([suggestion.positionId], topSupplierId);
+                      setSuggestions((current) => current.filter((s) => s.positionId !== suggestion.positionId));
+                    }}
+                    className="shrink-0 inline-flex items-center gap-1.5 bg-green-700 hover:bg-green-800 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    Übernehmen
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="divide-y divide-gray-100">
