@@ -29,19 +29,22 @@ class handler(BaseHTTPRequestHandler):
 
         try:
             pdf_bytes = supabase.storage.from_(BUCKET_NAME).download(body["storagePath"])
-            positions = extract_from_pdf_bytes(pdf_bytes)
+            result = extract_from_pdf_bytes(pdf_bytes)
             payload = {
                 "lvId": body["lvId"],
                 "secret": PDF_SERVICE_SECRET,
                 "success": True,
-                "positions": positions,
+                "positions": result["positions"],
+                "extraction_stage": result["extraction_stage"],
             }
         except Exception as exc:
             payload = {
                 "lvId": body["lvId"],
                 "secret": PDF_SERVICE_SECRET,
                 "success": False,
-                "error": str(exc),
+                "status": 422,
+                "error": getattr(exc, "message", str(exc)),
+                "details": getattr(exc, "stage_errors", []),
             }
 
         try:
@@ -49,7 +52,7 @@ class handler(BaseHTTPRequestHandler):
         except Exception:
             pass
 
-        self._respond(200, {"ok": True})
+        self._respond(200 if payload.get("success") else 422, {"ok": payload.get("success", False), "error": payload.get("error")})
 
     def _respond(self, status: int, data: dict) -> None:
         body = json.dumps(data).encode()

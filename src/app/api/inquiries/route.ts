@@ -30,13 +30,20 @@ export async function POST(req: NextRequest) {
       where: { tenantId: user.tenantId },
     });
 
+    const suppliers = await prisma.supplier.findMany({
+      where: { id: { in: validated.supplierIds }, tenantId: user.tenantId, isActive: true },
+    });
+    if (suppliers.length !== validated.supplierIds.length) {
+      return NextResponse.json({ error: "Ungültige Lieferanten für diesen Mandanten" }, { status: 400 });
+    }
+
     const inquiries = await prisma.$transaction(
-      validated.supplierIds.map((supplierId) =>
+      suppliers.map((supplier) =>
         prisma.inquiry.upsert({
-          where: { projectId_supplierId: { projectId: validated.projectId, supplierId } },
+          where: { projectId_supplierId: { projectId: validated.projectId, supplierId: supplier.id } },
           create: {
             projectId: validated.projectId,
-            supplierId,
+            supplierId: supplier.id,
             tenantId: user.tenantId,
             deadline: validated.deadline ? new Date(validated.deadline) : null,
             status: "DRAFT",
@@ -48,27 +55,30 @@ export async function POST(req: NextRequest) {
 
     // Send emails if Microsoft Graph is connected
     if (emailConn?.accessToken && emailConn.emailAddress) {
-      const suppliers = await prisma.supplier.findMany({
-        where: { id: { in: validated.supplierIds }, tenantId: user.tenantId },
-      });
-
       const results = await Promise.allSettled(
         inquiries.map(async (inquiry) => {
           const supplier = suppliers.find((s) => s.id === inquiry.supplierId);
           if (!supplier) return;
+
+          const assignedPositions = await prisma.inquiryPosition.findMany({
+            where: { inquiryId: inquiry.id, inquiry: { tenantId: user.tenantId } },
+            include: { position: true },
+            orderBy: { position: { sortOrder: "asc" } },
+          });
 
           const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/portal/${inquiry.portalToken}`;
 
           await sendInquiryEmail(emailConn.accessToken!, {
             from: emailConn.emailAddress!,
             to: supplier.email,
-            subject: `Angebotsanfrage: ${project.name}`,
+            subject: `Anfrage ${project.name} - ${supplier.companyName} - Ref:${inquiry.id}`,
             bodyHtml: buildEmailHtml({
               supplierName: supplier.companyName,
               projectName: project.name,
               portalUrl,
               deadline: inquiry.deadline ?? undefined,
               customMessage: validated.customMessage,
+              positions: assignedPositions.map((assignment) => assignment.position),
             }),
           });
 
@@ -107,10 +117,38 @@ function buildEmailHtml(params: {
   portalUrl: string;
   deadline?: Date;
   customMessage?: string;
+  positions: Array<{
+    positionNumber: string;
+    shortText: string;
+    quantity: { toString(): string } | null;
+    unit: string | null;
+  }>;
 }) {
   const deadlineText = params.deadline
     ? `<p>Angebotsfrist: <strong>${params.deadline.toLocaleDateString("de-DE")}</strong></p>`
     : "";
+  const positionRows = params.positions
+    .map((position) => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(position.positionNumber)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(position.shortText)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${escapeHtml(position.quantity?.toString() ?? "—")}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(position.unit ?? "—")}</td>
+      </tr>`).join("");
+  const positionsTable = `
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+      <thead>
+        <tr style="background: #f3f4f6;">
+          <th style="padding: 8px; text-align: left; border-bottom: 1px solid #d1d5db;">Pos-Nr</th>
+          <th style="padding: 8px; text-align: left; border-bottom: 1px solid #d1d5db;">Beschreibung</th>
+          <th style="padding: 8px; text-align: right; border-bottom: 1px solid #d1d5db;">Menge</th>
+          <th style="padding: 8px; text-align: left; border-bottom: 1px solid #d1d5db;">Einheit</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${positionRows || `<tr><td colspan="4" style="padding: 8px; color: #92400e;">Diesem Lieferanten wurden noch keine Positionen zugewiesen.</td></tr>`}
+      </tbody>
+    </table>`;
 
   return `
     <!DOCTYPE html>
@@ -125,6 +163,8 @@ function buildEmailHtml(params: {
         <p style="font-size: 18px; font-weight: bold; color: #2D6A4F;">${escapeHtml(params.projectName)}</p>
         ${deadlineText}
         ${params.customMessage ? `<p>${escapeHtml(params.customMessage)}</p>` : ""}
+        <p>Bitte kalkulieren Sie ausschließlich die folgenden Positionen:</p>
+        ${positionsTable}
         <p>Bitte klicken Sie auf den folgenden Button, um Ihr Angebot direkt einzugeben:</p>
         <a href="${params.portalUrl}" style="display: inline-block; background: #2D6A4F; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 16px 0;">
           Angebot abgeben →

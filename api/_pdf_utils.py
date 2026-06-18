@@ -1,107 +1,190 @@
 """Shared PDF extraction utilities for Vercel serverless functions."""
 
-import re
-import pdfplumber
+import base64
+import json
+import logging
+import os
 from io import BytesIO
 from typing import Optional
+import urllib.request
 
-POSITION_PATTERN = re.compile(
-    r"""
-    ^(?P<pos_num>\d{1,2}[.\-]\d{1,3}(?:[.\-]\d{1,3})?)
-    \s+
-    (?P<short_text>.+?)
-    (?:\s{2,}(?P<unit>[a-zA-Z²³/]+(?:\s[a-zA-Z²³/]+)?))?
-    (?:\s+(?P<qty>[\d,.]+))?
-    $
-    """,
-    re.VERBOSE,
-)
+import pdfplumber
+from pdf2image import convert_from_bytes
+import pytesseract
+from pydantic import BaseModel, ValidationError
 
-UNIT_KEYWORDS = {"m²", "m2", "m³", "m3", "m", "lm", "psch", "stk", "stück", "t", "kg", "l"}
+logger = logging.getLogger(__name__)
+
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+MIN_EXTRACTED_TEXT_LENGTH = 50
 
 
-def parse_quantity(raw: str) -> Optional[float]:
-    if not raw:
-        return None
-    cleaned = raw.replace(".", "").replace(",", ".")
+class ExtractedPosition(BaseModel):
+    positionNumber: str
+    shortText: str
+    longText: Optional[str] = None
+    unit: Optional[str] = None
+    quantity: Optional[float] = None
+    trade: Optional[str] = None
+    sortOrder: int
+
+
+class ExtractionResult(BaseModel):
+    positions: list[ExtractedPosition]
+    extraction_stage: int
+
+
+class ExtractionPipelineError(Exception):
+    def __init__(
+        self,
+        message: str,
+        stage_errors: Optional[list[str]] = None,
+        retryable_json: bool = False,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.stage_errors = stage_errors or []
+        self.retryable_json = retryable_json
+
+
+def _position_schema_prompt() -> str:
+    return """
+Return only valid JSON with this exact shape:
+{
+  "positions": [
+    {
+      "positionNumber": "string",
+      "shortText": "string",
+      "longText": "string or null",
+      "unit": "string or null",
+      "quantity": 0.0,
+      "trade": "string or null",
+      "sortOrder": 0
+    }
+  ]
+}
+Extract every bill-of-quantities line item. Use null for unknown optional fields.
+Do not include markdown, comments, explanations, or trailing commas.
+""".strip()
+
+
+def _call_claude(messages: list[dict]) -> str:
+    if not ANTHROPIC_API_KEY:
+        raise ExtractionPipelineError("ANTHROPIC_API_KEY is not configured")
+    payload = json.dumps({"model": ANTHROPIC_MODEL, "max_tokens": 8192, "temperature": 0, "messages": messages}).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=120) as response:
+        data = json.loads(response.read())
+    text = "".join(block.get("text", "") for block in data.get("content", []) if block.get("type") == "text").strip()
+    if not text:
+        raise ExtractionPipelineError("Claude returned an empty response")
+    return text
+
+
+def _parse_claude_positions(raw_text: str, stage: int) -> ExtractionResult:
     try:
-        return float(cleaned)
-    except ValueError:
-        return None
+        data = json.loads(raw_text)
+        return ExtractionResult(positions=data.get("positions", []), extraction_stage=stage)
+    except (json.JSONDecodeError, ValidationError, AttributeError) as exc:
+        raise ExtractionPipelineError(
+            f"Claude returned invalid extraction JSON at stage {stage}: {exc}",
+            retryable_json=True,
+        ) from exc
 
 
-def _positions_from_text(text: str) -> list[dict]:
-    positions = []
-    lines = text.splitlines()
-    current: Optional[dict] = None
-    long_lines: list[str] = []
-    order = 0
+def _call_claude_for_positions(messages: list[dict], stage: int) -> ExtractionResult:
+    raw = _call_claude(messages)
+    try:
+        return _parse_claude_positions(raw, stage)
+    except ExtractionPipelineError as exc:
+        if not exc.retryable_json:
+            raise
+        logger.warning("Claude returned invalid JSON at stage %s; retrying once", stage)
 
-    for line in lines:
-        s = line.strip()
-        if not s:
-            if current and long_lines:
-                current["longText"] = " ".join(long_lines).strip()
-                long_lines = []
-            continue
-
-        m = POSITION_PATTERN.match(s)
-        if m:
-            if current:
-                if long_lines:
-                    current["longText"] = " ".join(long_lines).strip()
-                positions.append(current)
-                long_lines = []
-            current = {
-                "positionNumber": m.group("pos_num"),
-                "shortText": m.group("short_text").strip(),
-                "unit": m.group("unit"),
-                "quantity": parse_quantity(m.group("qty") or ""),
-                "longText": None,
-                "trade": None,
-                "sortOrder": order,
-            }
-            order += 1
-        elif current:
-            parts = s.split()
-            if len(parts) <= 3 and parts[0].lower() in UNIT_KEYWORDS:
-                current["unit"] = parts[0]
-                if len(parts) > 1:
-                    current["quantity"] = parse_quantity(parts[1])
-            else:
-                long_lines.append(s)
-
-    if current:
-        if long_lines:
-            current["longText"] = " ".join(long_lines).strip()
-        positions.append(current)
-
-    return positions
+    retry_raw = _call_claude(messages)
+    return _parse_claude_positions(retry_raw, stage)
 
 
-def extract_from_pdf_bytes(pdf_bytes: bytes) -> list[dict]:
-    positions = []
+def _structure_text_with_claude(text: str, stage: int) -> ExtractionResult:
+    return _call_claude_for_positions(
+        [{"role": "user", "content": f"{_position_schema_prompt()}\n\nPDF text:\n{text}"}],
+        stage,
+    )
+
+
+def _extract_text_with_pdfplumber(pdf_bytes: bytes) -> str:
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-        full_text = ""
-        for page in pdf.pages:
-            for table in page.extract_tables():
-                for row in table:
-                    if not row or not row[0]:
-                        continue
-                    pos_num = str(row[0]).strip()
-                    if re.match(r"^\d+[.\-]\d+", pos_num):
-                        positions.append({
-                            "positionNumber": pos_num,
-                            "shortText": str(row[1] or "").strip()[:200],
-                            "unit": str(row[2] or "").strip() if len(row) > 2 else None,
-                            "quantity": parse_quantity(str(row[3] or "")),
-                            "longText": None,
-                            "trade": None,
-                            "sortOrder": len(positions),
-                        })
-            full_text += (page.extract_text() or "") + "\n"
+        return "\n".join(page.extract_text() or "" for page in pdf.pages).strip()
 
-        if not positions and full_text.strip():
-            positions = _positions_from_text(full_text)
 
-    return positions
+def _extract_text_with_ocr(pdf_bytes: bytes) -> str:
+    pages = convert_from_bytes(pdf_bytes)
+    return "\n".join(pytesseract.image_to_string(page) for page in pages).strip()
+
+
+def _pdf_pages_as_png_data(pdf_bytes: bytes) -> list[str]:
+    images = []
+    for page in convert_from_bytes(pdf_bytes):
+        buf = BytesIO()
+        page.save(buf, format="PNG")
+        images.append(base64.b64encode(buf.getvalue()).decode("ascii"))
+    return images
+
+
+def _extract_with_claude_vision(pdf_bytes: bytes) -> ExtractionResult:
+    content: list[dict] = [{"type": "text", "text": _position_schema_prompt()}]
+    content.extend(
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image}}
+        for image in _pdf_pages_as_png_data(pdf_bytes)
+    )
+    return _call_claude_for_positions([{"role": "user", "content": content}], 3)
+
+
+def extract_from_pdf_bytes(pdf_bytes: bytes) -> dict:
+    stage_errors: list[str] = []
+    try:
+        text = _extract_text_with_pdfplumber(pdf_bytes)
+        if len(text) >= MIN_EXTRACTED_TEXT_LENGTH:
+            logger.info("PDF extraction succeeded with stage 1 (pdfplumber)")
+            return _structure_text_with_claude(text, 1).model_dump()
+        stage_errors.append(f"stage 1 produced only {len(text)} characters")
+    except ExtractionPipelineError as exc:
+        if exc.retryable_json:
+            raise
+        stage_errors.append(f"stage 1 failed: {exc}")
+    except Exception as exc:
+        stage_errors.append(f"stage 1 failed: {exc}")
+    logger.info("PDF extraction stage 1 unavailable; falling back to stage 2")
+
+    try:
+        text = _extract_text_with_ocr(pdf_bytes)
+        if text.strip():
+            logger.info("PDF extraction succeeded with stage 2 (pytesseract OCR)")
+            return _structure_text_with_claude(text, 2).model_dump()
+        stage_errors.append("stage 2 produced empty OCR text")
+    except ExtractionPipelineError as exc:
+        if exc.retryable_json:
+            raise
+        stage_errors.append(f"stage 2 failed: {exc}")
+    except Exception as exc:
+        stage_errors.append(f"stage 2 failed: {exc}")
+    logger.info("PDF extraction stage 2 unavailable; falling back to stage 3")
+
+    try:
+        result = _extract_with_claude_vision(pdf_bytes).model_dump()
+        logger.info("PDF extraction succeeded with stage 3 (Claude Vision)")
+        return result
+    except Exception as exc:
+        stage_errors.append(f"stage 3 failed: {exc}")
+        logger.exception("PDF extraction failed in stage 3 (Claude Vision)")
+        raise ExtractionPipelineError("All PDF extraction stages failed", stage_errors) from exc

@@ -2,7 +2,24 @@ version: "3.9"
 
 services:
   pdf-service:
-    build: ./services/pdf-service
+    build:
+      context: ./services/pdf-service
+      dockerfile_inline: |
+        FROM python:3.13-slim
+
+        WORKDIR /app
+
+        RUN apt-get update && apt-get install -y --no-install-recommends \
+            libpoppler-cpp-dev \
+            && rm -rf /var/lib/apt/lists/*
+
+        COPY requirements.txt .
+        RUN pip install --no-cache-dir -r requirements.txt
+
+        COPY . .
+
+        EXPOSE 8000
+        CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
     env_file:
