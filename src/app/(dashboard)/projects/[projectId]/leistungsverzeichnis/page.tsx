@@ -5,6 +5,8 @@ import UploadLvButton from "@/components/forms/UploadLvButton";
 import DeleteLvButton from "@/components/forms/DeleteLvButton";
 import EditablePositionRow from "@/components/forms/EditablePositionRow";
 import AddPositionForm from "@/components/forms/AddPositionForm";
+import AiRetryExtractionButton from "@/components/forms/AiRetryExtractionButton";
+import { isAiEnabled } from "@/lib/anthropic/client";
 import { FileText, ChevronDown } from "lucide-react";
 
 interface Props {
@@ -28,6 +30,8 @@ export default async function PositionenPage({ params }: Props) {
   });
 
   if (!project) notFound();
+
+  const aiEnabled = isAiEnabled();
 
   const statusColors: Record<string, string> = {
     PENDING:    "bg-yellow-100 text-yellow-700",
@@ -80,6 +84,7 @@ export default async function PositionenPage({ params }: Props) {
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[lv.extractionStatus] ?? "bg-gray-100 text-gray-600"}`}>
                     {statusLabels[lv.extractionStatus] ?? lv.extractionStatus}
                   </span>
+                  {aiEnabled && lv.extractionStatus === "FAILED" && <AiRetryExtractionButton lvId={lv.id} />}
                   <DeleteLvButton lvId={lv.id} fileName={lv.fileName} />
                   <ChevronDown className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" />
                 </div>

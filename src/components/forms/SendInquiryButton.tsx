@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Send, X, Plus, Trash2 } from "lucide-react";
+import { Send, X, Sparkles } from "lucide-react";
 
 interface Supplier {
   id: string;
@@ -14,9 +14,10 @@ interface Supplier {
 interface Props {
   projectId: string;
   suppliers: Supplier[];
+  aiEnabled?: boolean;
 }
 
-export default function SendInquiryButton({ projectId, suppliers }: Props) {
+export default function SendInquiryButton({ projectId, suppliers, aiEnabled = false }: Props) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
@@ -24,7 +25,31 @@ export default function SendInquiryButton({ projectId, suppliers }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const router = useRouter();
+
+  async function draftEmail() {
+    if (selected.length === 0) {
+      setError("Bitte zuerst einen Lieferanten auswählen.");
+      return;
+    }
+    setAiLoading(true);
+    setError("");
+
+    const res = await fetch("/api/ai/inquiry-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, supplierId: selected[0] }),
+    });
+
+    setAiLoading(false);
+    if (!res.ok) {
+      setError("KI-Entwurf fehlgeschlagen. Bitte erneut versuchen.");
+      return;
+    }
+    const body = (await res.json()) as { data: { subject: string; body: string } };
+    setMessage(body.data.body);
+  }
 
   function toggleSupplier(id: string) {
     setSelected((prev) =>
@@ -145,9 +170,23 @@ export default function SendInquiryButton({ projectId, suppliers }: Props) {
 
                 {/* Custom message */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Persönliche Nachricht (optional)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Persönliche Nachricht (optional)
+                    </label>
+                    {aiEnabled && (
+                      <button
+                        type="button"
+                        onClick={draftEmail}
+                        disabled={aiLoading || selected.length === 0}
+                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:text-green-900 font-medium disabled:opacity-50"
+                        title="Nutzt den ersten ausgewählten Lieferanten"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {aiLoading ? "Entwurf läuft…" : "E-Mail vorformulieren"}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     rows={3}
                     value={message}
