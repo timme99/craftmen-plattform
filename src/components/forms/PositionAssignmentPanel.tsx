@@ -35,10 +35,9 @@ interface Props {
   projectId: string;
   positions: Position[];
   suppliers: Supplier[];
-  aiEnabled?: boolean;
 }
 
-export default function PositionAssignmentPanel({ projectId, positions, suppliers, aiEnabled = false }: Props) {
+export default function PositionAssignmentPanel({ projectId, positions, suppliers }: Props) {
   const router = useRouter();
   const [selectedPositionIds, setSelectedPositionIds] = useState<string[]>([]);
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
@@ -135,17 +134,15 @@ export default function PositionAssignmentPanel({ projectId, positions, supplier
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          {aiEnabled && (
-            <button
-              type="button"
-              onClick={fetchSuggestions}
-              disabled={aiLoading || localPositions.length === 0 || suppliers.length === 0}
-              className="inline-flex items-center justify-center gap-2 border border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50 text-sm font-medium px-3 py-2 rounded-lg"
-            >
-              <Sparkles className="w-4 h-4" />
-              {aiLoading ? "Analysiert…" : "KI-Zuordnung vorschlagen"}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={fetchSuggestions}
+            disabled={aiLoading || localPositions.length === 0 || suppliers.length === 0}
+            className="inline-flex items-center justify-center gap-2 border border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50 text-sm font-medium px-3 py-2 rounded-lg"
+          >
+            <Sparkles className="w-4 h-4" />
+            {aiLoading ? "Analysiert…" : "KI-Zuordnung vorschlagen"}
+          </button>
           <select
             value={supplierId}
             onChange={(event) => setSupplierId(event.target.value)}

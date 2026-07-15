@@ -7,7 +7,6 @@ import PositionAssignmentPanel from "@/components/forms/PositionAssignmentPanel"
 import OfferDetailModal from "@/components/dashboard/OfferDetailModal";
 import OfferAnalysisButton from "@/components/forms/OfferAnalysisButton";
 import AiParseOfferButton from "@/components/forms/AiParseOfferButton";
-import { isAiEnabled } from "@/lib/anthropic/client";
 import { Users } from "lucide-react";
 
 interface Props {
@@ -79,8 +78,7 @@ export default async function AnfragenPage({ params }: Props) {
 
   const inquiries = project.inquiries;
   const received = inquiries.filter((i) => i.status === "OFFER_RECEIVED").length;
-  const aiEnabled = isAiEnabled();
-  const positions = (project.leistungsverzeichnis[0]?.positions ?? []).map((position) => ({
+  const positions =(project.leistungsverzeichnis[0]?.positions ?? []).map((position) => ({
     id: position.id,
     positionNumber: position.positionNumber,
     shortText: position.shortText,
@@ -101,13 +99,13 @@ export default async function AnfragenPage({ params }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {aiEnabled && received > 0 && <OfferAnalysisButton projectId={project.id} />}
+          {received > 0 && <OfferAnalysisButton projectId={project.id} />}
           <EmailScannerButton />
-          <SendInquiryButton projectId={project.id} suppliers={allSuppliers} aiEnabled={aiEnabled} />
+          <SendInquiryButton projectId={project.id} suppliers={allSuppliers} />
         </div>
       </div>
 
-      <PositionAssignmentPanel projectId={project.id} positions={positions} suppliers={allSuppliers} aiEnabled={aiEnabled} />
+      <PositionAssignmentPanel projectId={project.id} positions={positions} suppliers={allSuppliers} />
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-700">
         <p className="font-semibold text-gray-900 mb-2">Reminder-Timeline</p>
@@ -172,7 +170,7 @@ export default async function AnfragenPage({ params }: Props) {
                             Portal öffnen
                           </a>
                         )}
-                        {aiEnabled && inq.emailMessageId && inq.offers.length === 0 && (
+                        {inq.emailMessageId && inq.offers.length === 0 && (
                           <AiParseOfferButton inquiryId={inq.id} />
                         )}
                       </div>
