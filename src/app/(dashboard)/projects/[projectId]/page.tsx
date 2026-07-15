@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
@@ -8,6 +9,7 @@ import ExportPreisspiegelButton from "@/components/forms/ExportPreisspiegelButto
 import ProjectStatusDropdown from "@/components/forms/ProjectStatusDropdown";
 import ProjectAutomationActions from "@/components/forms/ProjectAutomationActions";
 import AwardProjectForm from "@/components/forms/AwardProjectForm";
+import ExtractionStatusWatcher from "@/components/dashboard/ExtractionStatusWatcher";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -35,6 +37,26 @@ export default async function ProjectDetailPage({ params }: Props) {
   ]);
 
   if (!project) notFound();
+
+  const pendingLvIds = project.leistungsverzeichnis
+    .filter((lv) => lv.extractionStatus === "PENDING" || lv.extractionStatus === "PROCESSING")
+    .map((lv) => lv.id);
+
+  const lvStatusLabels: Record<string, string> = {
+    PENDING:    "Ausstehend",
+    PROCESSING: "Wird verarbeitet",
+    COMPLETED:  "Fertig",
+    FAILED:     "Fehler",
+  };
+
+  const inquiryStatusLabels: Record<string, string> = {
+    DRAFT:          "Entwurf",
+    SENT:           "Gesendet",
+    OPENED:         "Geöffnet",
+    OFFER_RECEIVED: "Angebot erhalten",
+    DECLINED:       "Abgelehnt",
+    EXPIRED:        "Abgelaufen",
+  };
 
   const offerCount = project.inquiries.filter(
     (i) => i.status === "OFFER_RECEIVED"
@@ -92,6 +114,8 @@ export default async function ProjectDetailPage({ params }: Props) {
         ))}
       </div>
 
+      <ExtractionStatusWatcher projectId={project.id} pendingLvIds={pendingLvIds} />
+
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Leistungsverzeichnisse</h2>
@@ -105,7 +129,12 @@ export default async function ProjectDetailPage({ params }: Props) {
           <ul className="space-y-2">
             {project.leistungsverzeichnis.map((lv) => (
               <li key={lv.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 text-sm">
-                <span className="font-medium truncate">{lv.fileName}</span>
+                <Link
+                  href={`/projects/${project.id}/leistungsverzeichnis`}
+                  className="font-medium truncate hover:text-green-800 hover:underline"
+                >
+                  {lv.fileName}
+                </Link>
                 <span
                   className={`ml-3 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
                     lv.extractionStatus === "COMPLETED"
@@ -115,7 +144,7 @@ export default async function ProjectDetailPage({ params }: Props) {
                       : "bg-yellow-100 text-yellow-700"
                   }`}
                 >
-                  {lv.extractionStatus}
+                  {lvStatusLabels[lv.extractionStatus] ?? lv.extractionStatus}
                 </span>
               </li>
             ))}
@@ -131,7 +160,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             {project.inquiries.map((i) => (
               <li key={i.id} className="flex justify-between">
                 <span>{i.supplier.companyName}</span>
-                <span className="text-gray-500">{i.status}</span>
+                <span className="text-gray-500">{inquiryStatusLabels[i.status] ?? i.status}</span>
               </li>
             ))}
           </ul>

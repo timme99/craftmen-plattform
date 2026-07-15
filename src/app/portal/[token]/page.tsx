@@ -24,7 +24,13 @@ export default async function SupplierPortalPage({ params }: Props) {
         include: { position: true },
         orderBy: { position: { sortOrder: "asc" } },
       },
-      offers: { orderBy: { createdAt: "desc" }, take: 1 },
+      offers: {
+        // Nur Portal-Angebote vorbelegen — E-Mail-Importe tragen interne Notizen
+        where: { source: "PORTAL" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: { offerItems: true },
+      },
     },
   });
 
@@ -43,12 +49,25 @@ export default async function SupplierPortalPage({ params }: Props) {
   // Nur zugewiesene Positionen zeigen (konsistent zur Anfrage-E-Mail);
   // ohne Zuweisung wie bisher das komplette LV
   const assignedPositions = inquiry.positions.map((assignment) => assignment.position);
-  const positions =
+  const positions = (
     assignedPositions.length > 0
       ? assignedPositions
-      : inquiry.project.leistungsverzeichnis.flatMap((lv) => lv.positions);
+      : inquiry.project.leistungsverzeichnis.flatMap((lv) => lv.positions)
+  ).map((position) => ({
+    id: position.id,
+    positionNumber: position.positionNumber,
+    shortText: position.shortText,
+    longText: position.longText,
+    unit: position.unit,
+    quantity: position.quantity != null ? Number(position.quantity) : null,
+  }));
 
   const existingOffer = inquiry.offers[0];
+  const initialPrices = Object.fromEntries(
+    (existingOffer?.offerItems ?? [])
+      .filter((item) => item.unitPrice != null)
+      .map((item) => [item.positionId, item.unitPrice!.toString()])
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -90,7 +109,10 @@ export default async function SupplierPortalPage({ params }: Props) {
         <SupplierPortalForm
           inquiryId={inquiry.id}
           positions={positions}
-          existingOffer={existingOffer ?? null}
+          initialPrices={initialPrices}
+          existingNotes={existingOffer?.notes ?? null}
+          existingVatRate={existingOffer?.vatRate?.toString() ?? null}
+          hasExistingOffer={Boolean(existingOffer)}
         />
       </div>
     </div>

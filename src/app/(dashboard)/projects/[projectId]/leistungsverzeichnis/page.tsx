@@ -7,6 +7,7 @@ import EditablePositionRow from "@/components/forms/EditablePositionRow";
 import AddPositionForm from "@/components/forms/AddPositionForm";
 import AiRetryExtractionButton from "@/components/forms/AiRetryExtractionButton";
 import PositionAssignmentPanel from "@/components/forms/PositionAssignmentPanel";
+import ExtractionStatusWatcher from "@/components/dashboard/ExtractionStatusWatcher";
 import { FileText, ChevronDown } from "lucide-react";
 
 interface Props {
@@ -42,6 +43,10 @@ export default async function PositionenPage({ params }: Props) {
   ]);
 
   if (!project) notFound();
+
+  const pendingLvIds = project.leistungsverzeichnis
+    .filter((lv) => lv.extractionStatus === "PENDING" || lv.extractionStatus === "PROCESSING")
+    .map((lv) => lv.id);
 
   const assignablePositions = project.leistungsverzeichnis.flatMap((lv) =>
     lv.positions.map((position) => ({
@@ -83,6 +88,8 @@ export default async function PositionenPage({ params }: Props) {
         <UploadLvButton projectId={project.id} />
       </div>
 
+      <ExtractionStatusWatcher projectId={project.id} pendingLvIds={pendingLvIds} />
+
       {project.leistungsverzeichnis.length > 0 && (
         <PositionAssignmentPanel projectId={project.id} positions={assignablePositions} suppliers={allSuppliers} />
       )}
@@ -118,10 +125,17 @@ export default async function PositionenPage({ params }: Props) {
               </summary>
 
               <div className="px-5 pb-5 border-t border-gray-100">
+                {lv.extractionStatus === "FAILED" && lv.errorMessage && (
+                  <p className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2 mt-4">
+                    Extraktion fehlgeschlagen: {lv.errorMessage}
+                  </p>
+                )}
                 {lv.positions.length === 0 ? (
                   <p className="text-sm text-gray-400 py-4 text-center">
                     {lv.extractionStatus === "COMPLETED"
                       ? "Keine Positionen extrahiert."
+                      : lv.extractionStatus === "FAILED"
+                      ? "Keine Positionen vorhanden. Versuche die KI-Extraktion erneut."
                       : "Extraktion läuft noch…"}
                   </p>
                 ) : (

@@ -1,22 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import { Position, Offer } from "@prisma/client";
+
+export interface PortalPosition {
+  id: string;
+  positionNumber: string;
+  shortText: string;
+  longText: string | null;
+  unit: string | null;
+  quantity: number | null;
+}
 
 interface Props {
   inquiryId: string;
-  positions: Position[];
-  existingOffer: Offer | null;
+  positions: PortalPosition[];
+  /** Vorbelegung aus dem zuletzt übermittelten Angebot */
+  initialPrices?: Record<string, string>;
+  existingNotes?: string | null;
+  existingVatRate?: string | null;
+  hasExistingOffer?: boolean;
 }
 
 export default function SupplierPortalForm({
   inquiryId,
   positions,
-  existingOffer,
+  initialPrices,
+  existingNotes,
+  existingVatRate,
+  hasExistingOffer = false,
 }: Props) {
-  const [prices, setPrices] = useState<Record<string, string>>({});
-  const [notes, setNotes] = useState(existingOffer?.notes ?? "");
-  const [vatRate, setVatRate] = useState("19");
+  const [prices, setPrices] = useState<Record<string, string>>(initialPrices ?? {});
+  const [notes, setNotes] = useState(existingNotes ?? "");
+  const [vatRate, setVatRate] = useState(existingVatRate ?? "19");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -88,6 +103,12 @@ export default function SupplierPortalForm({
 
   return (
     <form onSubmit={handleSubmit}>
+      {hasExistingOffer && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900 mb-4">
+          Sie haben bereits ein Angebot übermittelt. Ihre bisherigen Preise sind
+          vorbelegt — ein erneutes Absenden übermittelt eine aktualisierte Fassung.
+        </div>
+      )}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
