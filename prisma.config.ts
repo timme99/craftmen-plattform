@@ -3,12 +3,49 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+/**
+ * Verbindungs-URL für die Prisma-CLI (migrate deploy/dev, studio).
+ *
+ * Migrationen brauchen eine Session-Verbindung: über den Supabase-
+ * Transaktions-Pooler (Port 6543) blockiert Prismas Advisory Lock und der
+ * Vercel-Build läuft in den Timeout. Der Direkt-Host db.<ref>.supabase.co
+ * ist wiederum IPv6-only und aus IPv4-Umgebungen wie Vercel-Builds nicht
+ * erreichbar. In beiden Fällen wird deshalb der Session-Pooler aus der
+ * DATABASE_URL abgeleitet (gleicher Host und Zugang, Port 5432, ohne
+ * PgBouncer-Parameter).
+ */
+function resolveMigrateUrl(): string | undefined {
+  const direct = process.env["DIRECT_URL"];
+  const pooled = process.env["DATABASE_URL"];
+
+  const isIpv6OnlyDirectHost = (value: string) =>
+    /@db\.[^.]+\.supabase\.co[:/]/.test(value);
+
+  if (direct && !isIpv6OnlyDirectHost(direct)) return direct;
+
+  if (pooled) {
+    try {
+      const url = new URL(pooled);
+      if (url.hostname.endsWith(".pooler.supabase.com")) {
+        url.port = "5432";
+        url.searchParams.delete("pgbouncer");
+        url.searchParams.delete("connection_limit");
+        return url.toString();
+      }
+    } catch {
+      // URL nicht parsebar — unten unverändert zurückgeben
+    }
+  }
+
+  return direct || pooled;
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: resolveMigrateUrl(),
   },
 });
