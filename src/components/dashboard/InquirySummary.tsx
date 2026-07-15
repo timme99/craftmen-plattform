@@ -7,7 +7,6 @@ import { CheckCircle, Clock, Send, X } from "lucide-react";
 type InquiryWithDetails = Inquiry & { supplier: Supplier; offers: Offer[] };
 
 interface Props {
-  projectId: string;
   inquiries: InquiryWithDetails[];
 }
 
@@ -29,7 +28,7 @@ const statusLabels: Record<InquiryStatus, string> = {
   EXPIRED:        "Abgelaufen",
 };
 
-export default function InquirySummary({ projectId, inquiries }: Props) {
+export default function InquirySummary({ inquiries }: Props) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <h2 className="text-lg font-semibold mb-4">Lieferantenanfragen</h2>

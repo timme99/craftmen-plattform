@@ -7,14 +7,12 @@ interface Props {
   inquiryId: string;
   positions: Position[];
   existingOffer: Offer | null;
-  supplierName: string;
 }
 
 export default function SupplierPortalForm({
   inquiryId,
   positions,
   existingOffer,
-  supplierName,
 }: Props) {
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState(existingOffer?.notes ?? "");
@@ -44,6 +42,12 @@ export default function SupplierPortalForm({
         positionId: p.id,
         unitPrice: parseFloat(prices[p.id]),
       }));
+
+    if (items.length === 0) {
+      setError("Bitte geben Sie mindestens einen Preis ein.");
+      setSubmitting(false);
+      return;
+    }
 
     const res = await fetch("/api/offers", {
       method: "POST",

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import { sendInquiryEmail } from "@/lib/graph/client";
+import { getGraphAccess } from "@/lib/graph/token";
+import { escapeHtml } from "@/lib/security";
 
 export const maxDuration = 10;
 
@@ -12,9 +14,9 @@ export async function POST(req: NextRequest) {
     const user = await requireTenant();
     const { dryRun = false } = (await req.json().catch(() => ({}))) as { dryRun?: boolean };
 
-    const emailConn = await prisma.emailConnection.findUnique({ where: { tenantId: user.tenantId } });
+    const graphAccess = await getGraphAccess(user.tenantId);
 
-    if (!emailConn?.accessToken || !emailConn.emailAddress) {
+    if (!graphAccess) {
       return NextResponse.json({ error: "Kein E-Mail Konto verbunden" }, { status: 400 });
     }
 
@@ -49,11 +51,11 @@ export async function POST(req: NextRequest) {
 
         const prefix = stage === "escalate1" ? "Eskalation" : stage === "remind3" ? "Erinnerung" : "Vorwarnung";
 
-        return sendInquiryEmail(emailConn.accessToken!, {
-          from: emailConn.emailAddress!,
+        return sendInquiryEmail(graphAccess.accessToken, {
+          from: graphAccess.emailAddress,
           to: inq.supplier.email,
           subject: `${prefix}: Angebotsfrist ${inq.project.name}`,
-          bodyHtml: `<p>${prefix} zur Angebotsabgabe für <strong>${inq.project.name}</strong>.</p><p>Frist: <strong>${inq.deadline?.toLocaleDateString("de-DE") ?? "offen"}</strong></p>`,
+          bodyHtml: `<p>${prefix} zur Angebotsabgabe für <strong>${escapeHtml(inq.project.name)}</strong>.</p><p>Frist: <strong>${inq.deadline?.toLocaleDateString("de-DE") ?? "offen"}</strong></p>`,
         })
       })
     );

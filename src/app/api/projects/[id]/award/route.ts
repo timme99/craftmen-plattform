@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import { sendInquiryEmail } from "@/lib/graph/client";
+import { getGraphAccess } from "@/lib/graph/token";
+import { escapeHtml } from "@/lib/security";
 import { logAudit } from "@/lib/audit";
 
 export const maxDuration = 10;
@@ -73,8 +75,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ success: true, notified: 0, skippedEmail: true });
     }
 
-    const emailConn = await prisma.emailConnection.findUnique({ where: { tenantId: user.tenantId } });
-    if (!emailConn?.accessToken || !emailConn.emailAddress) {
+    const graphAccess = await getGraphAccess(user.tenantId);
+    if (!graphAccess) {
       return NextResponse.json({ success: true, notified: 0, skippedEmail: true });
     }
 
@@ -82,11 +84,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     const results = await Promise.allSettled(
       recipients.map((inquiry) => {
         const isWinner = inquiry.id === winningInquiryId;
+        const projectName = escapeHtml(project.name);
         const bodyHtml = isWinner
-          ? `<p>Vielen Dank für Ihr Angebot.</p><p>Wir haben Ihr Angebot für das Projekt <strong>${project.name}</strong> ausgewählt.</p>`
-          : `<p>Vielen Dank für Ihr Angebot.</p><p>Für das Projekt <strong>${project.name}</strong> haben wir uns für einen anderen Anbieter entschieden.</p>`;
-        return sendInquiryEmail(emailConn.accessToken!, {
-          from: emailConn.emailAddress!,
+          ? `<p>Vielen Dank für Ihr Angebot.</p><p>Wir haben Ihr Angebot für das Projekt <strong>${projectName}</strong> ausgewählt.</p>`
+          : `<p>Vielen Dank für Ihr Angebot.</p><p>Für das Projekt <strong>${projectName}</strong> haben wir uns für einen anderen Anbieter entschieden.</p>`;
+        return sendInquiryEmail(graphAccess.accessToken, {
+          from: graphAccess.emailAddress,
           to: inquiry.supplier.email,
           subject: isWinner ? `Zuschlag: ${project.name}` : `Update zur Anfrage: ${project.name}`,
           bodyHtml,

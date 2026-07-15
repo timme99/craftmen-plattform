@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requireTenant } from "@/lib/utils/tenant";
 import { sendInquiryEmail } from "@/lib/graph/client";
+import { getGraphAccess } from "@/lib/graph/token";
 import { escapeHtml } from "@/lib/security";
 import { logAudit } from "@/lib/audit";
 
@@ -26,9 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const emailConn = await prisma.emailConnection.findUnique({
-      where: { tenantId: user.tenantId },
-    });
+    const graphAccess = await getGraphAccess(user.tenantId);
 
     const suppliers = await prisma.supplier.findMany({
       where: { id: { in: validated.supplierIds }, tenantId: user.tenantId, isActive: true },
@@ -54,7 +53,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Send emails if Microsoft Graph is connected
-    if (emailConn?.accessToken && emailConn.emailAddress) {
+    if (graphAccess) {
       const results = await Promise.allSettled(
         inquiries.map(async (inquiry) => {
           const supplier = suppliers.find((s) => s.id === inquiry.supplierId);
@@ -68,8 +67,8 @@ export async function POST(req: NextRequest) {
 
           const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/portal/${inquiry.portalToken}`;
 
-          await sendInquiryEmail(emailConn.accessToken!, {
-            from: emailConn.emailAddress!,
+          await sendInquiryEmail(graphAccess.accessToken, {
+            from: graphAccess.emailAddress,
             to: supplier.email,
             subject: `Anfrage ${project.name} - ${supplier.companyName} - Ref:${inquiry.id}`,
             bodyHtml: buildEmailHtml({

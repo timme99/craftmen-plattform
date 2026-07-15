@@ -2,17 +2,16 @@ import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import { getInboxMessages, getMessageAttachments } from "@/lib/graph/client";
+import { getGraphAccess } from "@/lib/graph/token";
 
 // POST /api/email-scanner — scannt Postfach nach Angebotsantworten
 export async function POST() {
   try {
     const user = await requireTenant();
 
-    const emailConn = await prisma.emailConnection.findUnique({
-      where: { tenantId: user.tenantId },
-    });
+    const graphAccess = await getGraphAccess(user.tenantId);
 
-    if (!emailConn?.accessToken || !emailConn.emailAddress) {
+    if (!graphAccess) {
       return NextResponse.json(
         { error: "Kein E-Mail-Konto verbunden. Bitte unter Einstellungen konfigurieren." },
         { status: 400 }
@@ -43,8 +42,8 @@ export async function POST() {
     const filter = `hasAttachments eq true and receivedDateTime ge ${since.toISOString()}`;
 
     const messagesResult = await getInboxMessages(
-      emailConn.accessToken,
-      emailConn.emailAddress,
+      graphAccess.accessToken,
+      graphAccess.emailAddress,
       filter
     );
 
@@ -67,8 +66,8 @@ export async function POST() {
 
       // Anhänge laden
       const attachmentsResult = await getMessageAttachments(
-        emailConn.accessToken,
-        emailConn.emailAddress,
+        graphAccess.accessToken,
+        graphAccess.emailAddress,
         msg.id
       );
       const attachments: Array<{

@@ -5,6 +5,7 @@ import { requireTenant } from "@/lib/utils/tenant";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { getMessageAttachments } from "@/lib/graph/client";
+import { getGraphAccess } from "@/lib/graph/token";
 import { matchExtractedPositions } from "@/lib/matching/semantic";
 import { extractPositionsFromPdf, isAiEnabled } from "@/lib/anthropic/client";
 
@@ -51,14 +52,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Keine zugeordnete E-Mail vorhanden" }, { status: 400 });
     }
 
-    const emailConn = await prisma.emailConnection.findUnique({ where: { tenantId: user.tenantId } });
-    if (!emailConn?.accessToken || !emailConn.emailAddress) {
+    const graphAccess = await getGraphAccess(user.tenantId);
+    if (!graphAccess) {
       return NextResponse.json({ error: "Keine E-Mail-Verbindung konfiguriert" }, { status: 400 });
     }
 
     const attachmentsResponse = (await getMessageAttachments(
-      emailConn.accessToken,
-      emailConn.emailAddress,
+      graphAccess.accessToken,
+      graphAccess.emailAddress,
       inquiry.emailMessageId
     )) as { value?: GraphAttachment[] };
 
