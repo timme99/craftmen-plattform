@@ -14,10 +14,9 @@ interface Supplier {
 interface Props {
   projectId: string;
   suppliers: Supplier[];
-  aiEnabled?: boolean;
 }
 
-export default function SendInquiryButton({ projectId, suppliers, aiEnabled = false }: Props) {
+export default function SendInquiryButton({ projectId, suppliers }: Props) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
@@ -44,7 +43,8 @@ export default function SendInquiryButton({ projectId, suppliers, aiEnabled = fa
 
     setAiLoading(false);
     if (!res.ok) {
-      setError("KI-Entwurf fehlgeschlagen. Bitte erneut versuchen.");
+      const body = await res.json().catch(() => ({}));
+      setError(typeof body.error === "string" ? body.error : "KI-Entwurf fehlgeschlagen. Bitte erneut versuchen.");
       return;
     }
     const body = (await res.json()) as { data: { subject: string; body: string } };
@@ -174,18 +174,16 @@ export default function SendInquiryButton({ projectId, suppliers, aiEnabled = fa
                     <label className="block text-sm font-medium text-gray-700">
                       Persönliche Nachricht (optional)
                     </label>
-                    {aiEnabled && (
-                      <button
-                        type="button"
-                        onClick={draftEmail}
-                        disabled={aiLoading || selected.length === 0}
-                        className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:text-green-900 font-medium disabled:opacity-50"
-                        title="Nutzt den ersten ausgewählten Lieferanten"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {aiLoading ? "Entwurf läuft…" : "E-Mail vorformulieren"}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={draftEmail}
+                      disabled={aiLoading || selected.length === 0}
+                      className="inline-flex items-center gap-1.5 text-xs text-green-700 hover:text-green-900 font-medium disabled:opacity-50"
+                      title="Nutzt den ersten ausgewählten Lieferanten"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {aiLoading ? "Entwurf läuft…" : "E-Mail vorformulieren"}
+                    </button>
                   </div>
                   <textarea
                     rows={3}
