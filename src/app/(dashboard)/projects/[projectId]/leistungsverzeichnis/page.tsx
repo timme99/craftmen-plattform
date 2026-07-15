@@ -6,6 +6,7 @@ import DeleteLvButton from "@/components/forms/DeleteLvButton";
 import EditablePositionRow from "@/components/forms/EditablePositionRow";
 import AddPositionForm from "@/components/forms/AddPositionForm";
 import AiRetryExtractionButton from "@/components/forms/AiRetryExtractionButton";
+import PositionAssignmentPanel from "@/components/forms/PositionAssignmentPanel";
 import { FileText, ChevronDown } from "lucide-react";
 
 interface Props {
@@ -16,19 +17,44 @@ export default async function PositionenPage({ params }: Props) {
   const { projectId } = await params;
   const user = await requireTenant();
 
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, tenantId: user.tenantId },
-    include: {
-      leistungsverzeichnis: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          positions: { orderBy: [{ sortOrder: "asc" }, { positionNumber: "asc" }] },
+  const [project, allSuppliers] = await Promise.all([
+    prisma.project.findFirst({
+      where: { id: projectId, tenantId: user.tenantId },
+      include: {
+        leistungsverzeichnis: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            positions: { orderBy: [{ sortOrder: "asc" }, { positionNumber: "asc" }] },
+          },
+        },
+        inquiries: {
+          include: {
+            supplier: true,
+            positions: { select: { positionId: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.supplier.findMany({
+      where: { tenantId: user.tenantId, isActive: true },
+      orderBy: { companyName: "asc" },
+    }),
+  ]);
 
   if (!project) notFound();
+
+  const assignablePositions = project.leistungsverzeichnis.flatMap((lv) =>
+    lv.positions.map((position) => ({
+      id: position.id,
+      positionNumber: position.positionNumber,
+      shortText: position.shortText,
+      quantity: position.quantity != null ? position.quantity.toString() : null,
+      unit: position.unit,
+      assignedSuppliers: project.inquiries
+        .filter((inquiry) => inquiry.positions.some((assignment) => assignment.positionId === position.id))
+        .map((inquiry) => ({ id: inquiry.supplier.id, companyName: inquiry.supplier.companyName })),
+    }))
+  );
 
   const statusColors: Record<string, string> = {
     PENDING:    "bg-yellow-100 text-yellow-700",
@@ -56,6 +82,10 @@ export default async function PositionenPage({ params }: Props) {
         </div>
         <UploadLvButton projectId={project.id} />
       </div>
+
+      {project.leistungsverzeichnis.length > 0 && (
+        <PositionAssignmentPanel projectId={project.id} positions={assignablePositions} suppliers={allSuppliers} />
+      )}
 
       {project.leistungsverzeichnis.length === 0 ? (
         <div className="text-center py-20 text-gray-400 bg-white rounded-xl border border-gray-200">
