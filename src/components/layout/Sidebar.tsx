@@ -3,19 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import { FolderOpen, Users, Settings, Leaf, Sparkles } from "lucide-react";
+import { Leaf, Sparkles } from "lucide-react";
+import { navItems } from "./nav-items";
 
-const navItems = [
-  { href: "/projects", label: "Projekte", icon: FolderOpen },
-  { href: "/suppliers", label: "Lieferanten", icon: Users },
-  { href: "/settings", label: "Einstellungen", icon: Settings },
-];
-
-export default function Sidebar() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-gradient-to-b from-green-950 via-green-900 to-emerald-900 text-white flex flex-col">
+    <div className="flex h-full flex-col bg-gradient-to-b from-green-950 via-green-900 to-emerald-900 text-white">
       <div className="px-5 py-5 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-green-300/90 flex items-center justify-center shadow-sm shadow-green-950/40">
@@ -35,6 +30,7 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
                 active
@@ -60,6 +56,16 @@ export default function Sidebar() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+export default function Sidebar() {
+  return (
+    <aside className="hidden md:block w-64 flex-shrink-0">
+      <SidebarContent />
     </aside>
   );
 }
+
+export { SidebarContent };

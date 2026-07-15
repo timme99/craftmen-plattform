@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
@@ -172,10 +173,10 @@ export default async function PreisspiegelPage({ params }: Props) {
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th colSpan={4} />
                 {suppliers.map((sup) => (
-                  <>
-                    <th key={`${sup.id}-ep`} className="text-right px-3 py-1.5 text-xs text-gray-400 border-l border-gray-200 w-24">EP (€)</th>
-                    <th key={`${sup.id}-gp`} className="text-right px-3 py-1.5 text-xs text-gray-400 w-24">GP (€)</th>
-                  </>
+                  <Fragment key={sup.id}>
+                    <th className="text-right px-3 py-1.5 text-xs text-gray-400 border-l border-gray-200 w-24">EP (€)</th>
+                    <th className="text-right px-3 py-1.5 text-xs text-gray-400 w-24">GP (€)</th>
+                  </Fragment>
                 ))}
               </tr>
             </thead>
@@ -195,14 +196,14 @@ export default async function PreisspiegelPage({ params }: Props) {
                     const item = sup.items[pos.id];
                     const isCheapest = cheapestByPosition[pos.id] === sup.id;
                     return (
-                      <>
-                        <td key={`${sup.id}-ep`} className={`px-3 py-2.5 text-right border-l border-gray-100 ${isCheapest ? "text-green-700" : "text-gray-700"}`}>
+                      <Fragment key={sup.id}>
+                        <td className={`px-3 py-2.5 text-right border-l border-gray-100 ${isCheapest ? "text-green-700" : "text-gray-700"}`}>
                           {fmt(item?.unitPrice)}
                         </td>
-                        <td key={`${sup.id}-gp`} className={`px-3 py-2.5 text-right font-medium ${isCheapest ? "bg-green-50 text-green-800" : "text-gray-800"}`}>
+                        <td className={`px-3 py-2.5 text-right font-medium ${isCheapest ? "bg-green-50 text-green-800" : "text-gray-800"}`}>
                           {fmt(item?.totalPrice)}
                         </td>
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tr>
@@ -212,12 +213,12 @@ export default async function PreisspiegelPage({ params }: Props) {
               <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
                 <td colSpan={4} className="px-4 py-3 text-sm text-gray-700">Gesamt Netto</td>
                 {suppliers.map((sup) => (
-                  <>
-                    <td key={`${sup.id}-ep-total`} className="border-l border-gray-200" />
-                    <td key={`${sup.id}-gp-total`} className="px-3 py-3 text-right text-sm text-green-800">
+                  <Fragment key={sup.id}>
+                    <td className="border-l border-gray-200" />
+                    <td className="px-3 py-3 text-right text-sm text-green-800">
                       {sup.totalNet ? `${fmt(sup.totalNet)} €` : "—"}
                     </td>
-                  </>
+                  </Fragment>
                 ))}
               </tr>
             </tfoot>

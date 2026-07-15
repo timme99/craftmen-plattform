@@ -1,6 +1,6 @@
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
-import ProjectCard from "@/components/dashboard/ProjectCard";
+import ProjectsGrid from "@/components/dashboard/ProjectsGrid";
 import CreateProjectButton from "@/components/forms/CreateProjectButton";
 import EmailScannerButton from "@/components/forms/EmailScannerButton";
 import { DashboardBriefing } from "@/components/dashboard/DashboardBriefing";
@@ -71,11 +71,16 @@ export default async function ProjectsPage() {
           <p className="text-sm mt-1">Lege dein erstes Projekt an, um Ausschreibungen zentral zu steuern.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
+        <ProjectsGrid
+          projects={projects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            location: project.location,
+            status: project.status,
+            lvCount: project._count.leistungsverzeichnis,
+            inquiryCount: project._count.inquiries,
+          }))}
+        />
       )}
     </div>
   );

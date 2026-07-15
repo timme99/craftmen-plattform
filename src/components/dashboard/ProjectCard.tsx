@@ -1,10 +1,19 @@
 import Link from "next/link";
-import { Project } from "@prisma/client";
+import type { ProjectStatus } from "@prisma/client";
 import { MapPin, FileText, Send, ArrowRight } from "lucide-react";
 import ProjectStatusBadge from "./ProjectStatusBadge";
 
+export interface ProjectCardData {
+  id: string;
+  name: string;
+  location: string | null;
+  status: ProjectStatus;
+  lvCount: number;
+  inquiryCount: number;
+}
+
 interface Props {
-  project: Project & { _count: { inquiries: number; leistungsverzeichnis: number } };
+  project: ProjectCardData;
 }
 
 export default function ProjectCard({ project }: Props) {
@@ -28,11 +37,11 @@ export default function ProjectCard({ project }: Props) {
         <div className="flex items-center gap-4 pt-4 border-t border-gray-100 text-xs text-gray-600">
           <span className="flex items-center gap-1">
             <FileText className="w-3.5 h-3.5" />
-            {project._count.leistungsverzeichnis} LV
+            {project.lvCount} LV
           </span>
           <span className="flex items-center gap-1">
             <Send className="w-3.5 h-3.5" />
-            {project._count.inquiries} Anfragen
+            {project.inquiryCount} Anfragen
           </span>
           <span className="ml-auto inline-flex items-center gap-1 text-green-700 font-medium group-hover:translate-x-0.5 transition-transform">
             Öffnen
