@@ -9,6 +9,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Die Prisma-CLI (migrate deploy/dev) braucht die Direktverbindung
+    // (Port 5432): über den Transaktions-Pooler (6543) hängt der
+    // Advisory Lock und der Vercel-Build läuft in den Timeout.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });
