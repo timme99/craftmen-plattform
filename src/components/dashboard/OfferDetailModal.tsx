@@ -84,7 +84,7 @@ export default function OfferDetailModal({ inquiryId, supplierName }: Props) {
                   <div className="grid grid-cols-3 gap-4">
                     {[
                       { label: "Netto", value: `${fmt(offer.totalNet)} €` },
-                      { label: "MwSt. (${offer.vatRate ?? 19}%)", value: offer.totalNet && offer.totalGross ? `${fmt(String(Number(offer.totalGross) - Number(offer.totalNet)))} €` : "—" },
+                      { label: `MwSt. (${offer.vatRate ?? 19}%)`, value: offer.totalNet && offer.totalGross ? `${fmt(String(Number(offer.totalGross) - Number(offer.totalNet)))} €` : "—" },
                       { label: "Brutto", value: `${fmt(offer.totalGross)} €` },
                     ].map((item) => (
                       <div key={item.label} className="bg-gray-50 rounded-lg p-3 text-center">
