@@ -20,6 +20,10 @@ export default async function SupplierPortalPage({ params }: Props) {
           },
         },
       },
+      positions: {
+        include: { position: true },
+        orderBy: { position: { sortOrder: "asc" } },
+      },
       offers: { orderBy: { createdAt: "desc" }, take: 1 },
     },
   });
@@ -36,9 +40,13 @@ export default async function SupplierPortalPage({ params }: Props) {
     });
   }
 
-  const positions = inquiry.project.leistungsverzeichnis.flatMap(
-    (lv) => lv.positions
-  );
+  // Nur zugewiesene Positionen zeigen (konsistent zur Anfrage-E-Mail);
+  // ohne Zuweisung wie bisher das komplette LV
+  const assignedPositions = inquiry.positions.map((assignment) => assignment.position);
+  const positions =
+    assignedPositions.length > 0
+      ? assignedPositions
+      : inquiry.project.leistungsverzeichnis.flatMap((lv) => lv.positions);
 
   const existingOffer = inquiry.offers[0];
 
@@ -62,6 +70,9 @@ export default async function SupplierPortalPage({ params }: Props) {
             {inquiry.project.name}
           </h2>
           <p className="text-sm text-gray-500 mt-1">
+            Angebot für: {inquiry.supplier.companyName}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">
             Bitte geben Sie Ihre Preise für die unten stehenden Positionen ein.
           </p>
           {inquiry.deadline && (
@@ -80,7 +91,6 @@ export default async function SupplierPortalPage({ params }: Props) {
           inquiryId={inquiry.id}
           positions={positions}
           existingOffer={existingOffer ?? null}
-          supplierName={inquiry.supplier.companyName}
         />
       </div>
     </div>

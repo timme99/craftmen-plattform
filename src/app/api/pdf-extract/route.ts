@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import { createClient } from "@/lib/supabase/server";
-import type { ExtractedPosition } from "@/types";
 
 export async function POST(req: NextRequest) {
   try {

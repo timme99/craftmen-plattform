@@ -150,7 +150,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         </ul>
       </div>
 
-      <InquirySummary projectId={project.id} inquiries={project.inquiries} />
+      <InquirySummary inquiries={project.inquiries} />
     </div>
   );
 }

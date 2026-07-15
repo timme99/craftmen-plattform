@@ -7,13 +7,15 @@ import { logAudit } from "@/lib/audit";
 const submitOfferSchema = z.object({
   inquiryId: z.string().uuid(),
   portalToken: z.string().uuid(),
-  items: z.array(
-    z.object({
-      positionId: z.string().uuid(),
-      unitPrice: z.number().nonnegative(),
-      notes: z.string().optional(),
-    })
-  ),
+  items: z
+    .array(
+      z.object({
+        positionId: z.string().uuid(),
+        unitPrice: z.number().nonnegative(),
+        notes: z.string().optional(),
+      })
+    )
+    .min(1),
   notes: z.string().optional(),
   validUntil: z.string().datetime().optional(),
   vatRate: z.number().min(0).max(100).optional(),
@@ -41,6 +43,7 @@ export async function POST(req: NextRequest) {
             leistungsverzeichnis: { include: { positions: true } },
           },
         },
+        positions: true,
       },
     });
 
@@ -56,9 +59,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Inquiry is closed" }, { status: 410 });
     }
 
-    const positions = inquiry.project.leistungsverzeichnis.flatMap(
+    const lvPositions = inquiry.project.leistungsverzeichnis.flatMap(
       (lv) => lv.positions
     );
+
+    // Sind Positionen zugewiesen, darf nur für diese angeboten werden
+    // (gleiche Logik wie im Portal); ohne Zuweisung gilt das komplette LV
+    const assignedIds = new Set(inquiry.positions.map((p) => p.positionId));
+    const positions =
+      assignedIds.size > 0
+        ? lvPositions.filter((p) => assignedIds.has(p.id))
+        : lvPositions;
 
     const offerItems = validated.items
       .filter((item) => positions.some((p) => p.id === item.positionId))
