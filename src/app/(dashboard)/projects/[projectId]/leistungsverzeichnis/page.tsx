@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
@@ -6,9 +7,8 @@ import DeleteLvButton from "@/components/forms/DeleteLvButton";
 import EditablePositionRow from "@/components/forms/EditablePositionRow";
 import AddPositionForm from "@/components/forms/AddPositionForm";
 import AiRetryExtractionButton from "@/components/forms/AiRetryExtractionButton";
-import PositionAssignmentPanel from "@/components/forms/PositionAssignmentPanel";
 import ExtractionStatusWatcher from "@/components/dashboard/ExtractionStatusWatcher";
-import { FileText, ChevronDown } from "lucide-react";
+import { FileText, ChevronDown, Info } from "lucide-react";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -18,29 +18,23 @@ export default async function PositionenPage({ params }: Props) {
   const { projectId } = await params;
   const user = await requireTenant();
 
-  const [project, allSuppliers] = await Promise.all([
-    prisma.project.findFirst({
-      where: { id: projectId, tenantId: user.tenantId },
-      include: {
-        leistungsverzeichnis: {
-          orderBy: { createdAt: "desc" },
-          include: {
-            positions: { orderBy: [{ sortOrder: "asc" }, { positionNumber: "asc" }] },
-          },
-        },
-        inquiries: {
-          include: {
-            supplier: true,
-            positions: { select: { positionId: true } },
-          },
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, tenantId: user.tenantId },
+    include: {
+      leistungsverzeichnis: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          positions: { orderBy: [{ sortOrder: "asc" }, { positionNumber: "asc" }] },
         },
       },
-    }),
-    prisma.supplier.findMany({
-      where: { tenantId: user.tenantId, isActive: true },
-      orderBy: { companyName: "asc" },
-    }),
-  ]);
+      inquiries: {
+        include: {
+          supplier: true,
+          positions: { select: { positionId: true } },
+        },
+      },
+    },
+  });
 
   if (!project) notFound();
 
@@ -48,17 +42,20 @@ export default async function PositionenPage({ params }: Props) {
     .filter((lv) => lv.extractionStatus === "PENDING" || lv.extractionStatus === "PROCESSING")
     .map((lv) => lv.id);
 
-  const assignablePositions = project.leistungsverzeichnis.flatMap((lv) =>
-    lv.positions.map((position) => ({
-      id: position.id,
-      positionNumber: position.positionNumber,
-      shortText: position.shortText,
-      quantity: position.quantity != null ? position.quantity.toString() : null,
-      unit: position.unit,
-      assignedSuppliers: project.inquiries
-        .filter((inquiry) => inquiry.positions.some((assignment) => assignment.positionId === position.id))
-        .map((inquiry) => ({ id: inquiry.supplier.id, companyName: inquiry.supplier.companyName })),
-    }))
+  // positionId → Firmennamen der Lieferanten, denen die Position zugewiesen ist
+  const assignedSuppliersByPosition = new Map<string, string[]>();
+  for (const inquiry of project.inquiries) {
+    for (const assignment of inquiry.positions) {
+      const names = assignedSuppliersByPosition.get(assignment.positionId) ?? [];
+      names.push(inquiry.supplier.companyName);
+      assignedSuppliersByPosition.set(assignment.positionId, names);
+    }
+  }
+
+  const totalPositions = project.leistungsverzeichnis.reduce((sum, lv) => sum + lv.positions.length, 0);
+  const unassignedCount = project.leistungsverzeichnis.reduce(
+    (sum, lv) => sum + lv.positions.filter((pos) => !assignedSuppliersByPosition.has(pos.id)).length,
+    0
   );
 
   const statusColors: Record<string, string> = {
@@ -81,8 +78,7 @@ export default async function PositionenPage({ params }: Props) {
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Leistungsverzeichnisse</h2>
           <p className="text-sm text-gray-500">
-            {project.leistungsverzeichnis.length} LV ·{" "}
-            {project.leistungsverzeichnis.reduce((sum, lv) => sum + lv.positions.length, 0)} Positionen
+            {project.leistungsverzeichnis.length} LV · {totalPositions} Positionen
           </p>
         </div>
         <UploadLvButton projectId={project.id} />
@@ -91,7 +87,18 @@ export default async function PositionenPage({ params }: Props) {
       <ExtractionStatusWatcher projectId={project.id} pendingLvIds={pendingLvIds} />
 
       {project.leistungsverzeichnis.length > 0 && (
-        <PositionAssignmentPanel projectId={project.id} positions={assignablePositions} suppliers={allSuppliers} />
+        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-900">
+          <Info className="w-4 h-4 shrink-0 text-blue-600" />
+          <p>
+            Die Zuweisung von Positionen an Lieferanten erfolgt im Tab{" "}
+            <Link href={`/projects/${project.id}/inquiries`} className="font-semibold underline hover:text-blue-700">
+              Anfragen
+            </Link>
+            {unassignedCount > 0 && (
+              <> · {unassignedCount} Position{unassignedCount !== 1 ? "en" : ""} noch ohne Lieferant</>
+            )}
+          </p>
+        </div>
       )}
 
       {project.leistungsverzeichnis.length === 0 ? (
@@ -146,7 +153,8 @@ export default async function PositionenPage({ params }: Props) {
                           <th className="text-left pb-2 pr-4 w-16">Pos.</th>
                           <th className="text-left pb-2 pr-4">Kurztext</th>
                           <th className="text-right pb-2 pr-4 w-20">Einheit</th>
-                          <th className="text-right pb-2 w-24">Menge</th>
+                          <th className="text-right pb-2 pr-4 w-24">Menge</th>
+                          <th className="text-right pb-2 w-44">Zuweisung</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -159,6 +167,7 @@ export default async function PositionenPage({ params }: Props) {
                               shortText: pos.shortText,
                               unit: pos.unit,
                               quantity: pos.quantity != null ? Number(pos.quantity) : null,
+                              assignedSuppliers: assignedSuppliersByPosition.get(pos.id) ?? [],
                             }}
                           />
                         ))}

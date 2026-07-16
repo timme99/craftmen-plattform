@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
+import { normalizeUnit } from "@/lib/utils/units";
 import { z } from "zod";
 
 const schema = z.object({
   leistungsverzeichnisId: z.string().uuid(),
   positionNumber: z.string().min(1),
   shortText: z.string().min(1),
-  unit: z.string().min(1),
-  quantity: z.number().positive(),
+  unit: z.string().nullish(),
+  quantity: z.number().positive().nullish(),
   trade: z.string().optional(),
 });
 
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     if (!lv) return NextResponse.json({ error: "LV nicht gefunden" }, { status: 404 });
 
     const position = await prisma.position.create({
-      data: { leistungsverzeichnisId, ...data },
+      data: { leistungsverzeichnisId, ...data, unit: normalizeUnit(data.unit) },
     });
 
     return NextResponse.json(position, { status: 201 });

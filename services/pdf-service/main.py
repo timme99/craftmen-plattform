@@ -95,6 +95,52 @@ POSITION_PATTERN = re.compile(
 
 UNIT_KEYWORDS = {"m²", "m2", "m³", "m3", "m", "lm", "psch", "stk", "stück", "t", "kg", "l"}
 
+# Spiegelt src/lib/utils/units.ts (CANONICAL_UNITS / UNIT_ALIASES) — Änderungen dort nachziehen
+ALLOWED_UNITS = ["m²", "m³", "m", "lfm", "km", "Stk", "psch", "t", "kg", "g", "l", "h", "Tag"]
+
+UNIT_ALIAS_MAP = {
+    "m2": "m²",
+    "qm": "m²",
+    "m3": "m³",
+    "cbm": "m³",
+    "lm": "lfm",
+    "lfdm": "lfm",
+    "lfd m": "lfm",
+    "laufmeter": "lfm",
+    "st": "Stk",
+    "stk": "Stk",
+    "stck": "Stk",
+    "stück": "Stk",
+    "stueck": "Stk",
+    "psch": "psch",
+    "pausch": "psch",
+    "pauschal": "psch",
+    "std": "h",
+    "stunde": "h",
+    "stunden": "h",
+    "to": "t",
+    "tonne": "t",
+    "tonnen": "t",
+    "liter": "l",
+    "tag": "Tag",
+    "tage": "Tag",
+}
+
+_ALLOWED_UNITS_LOWER = {u.lower(): u for u in ALLOWED_UNITS}
+
+NUMBER_LIKE_PATTERN = re.compile(r"^[\d.,\s]+$")
+
+
+def normalize_extracted_unit(raw: Optional[str]) -> Optional[str]:
+    """Kanonisiert eine extrahierte Einheit; unbekannte Einheiten bleiben erhalten."""
+    if raw is None:
+        return None
+    trimmed = raw.strip()
+    if not trimmed:
+        return None
+    key = trimmed.replace(".", "").lower()
+    return UNIT_ALIAS_MAP.get(key) or _ALLOWED_UNITS_LOWER.get(key) or trimmed
+
 
 def parse_quantity(raw: str) -> Optional[float]:
     if not raw:
@@ -107,11 +153,12 @@ def parse_quantity(raw: str) -> Optional[float]:
 
 
 def _position_schema_prompt() -> str:
-    return """
+    allowed = ", ".join(ALLOWED_UNITS)
+    return f"""
 Return only valid JSON with this exact shape:
-{
+{{
   "positions": [
-    {
+    {{
       "positionNumber": "string",
       "shortText": "string",
       "longText": "string or null",
@@ -119,10 +166,22 @@ Return only valid JSON with this exact shape:
       "quantity": 0.0,
       "trade": "string or null",
       "sortOrder": 0
-    }
+    }}
   ]
-}
+}}
 Extract every bill-of-quantities line item. Use null for unknown optional fields.
+
+Rules for "unit" and "quantity":
+- "unit" is the unit of measure. Prefer one of: {allowed}.
+  Map variants to these spellings (e.g. m2 → m², qm → m², Stück/St. → Stk, pauschal → psch, lfd. m → lfm, Std. → h).
+  Only use a different unit string if the document clearly uses a unit not in the list. Use null if no unit is given.
+  "unit" must NEVER be a number.
+- "quantity" is the amount as a JSON number with a dot as decimal separator.
+  German documents write numbers as 1.234,56 (dot = thousands separator, comma = decimal) → output 1234.56.
+  "quantity" must NEVER contain a unit. Use null if no quantity is given.
+- Example: the line "01.02 Oberboden abtragen 250 m²" → "shortText": "Oberboden abtragen", "quantity": 250, "unit": "m²".
+  Never swap the two fields: the numeric value belongs in "quantity", the unit of measure in "unit".
+
 Do not include markdown, comments, explanations, or trailing commas.
 """.strip()
 
@@ -137,6 +196,21 @@ def _anthropic_headers() -> dict[str, str]:
     }
 
 
+def _normalize_position_units(position: ExtractedPosition) -> ExtractedPosition:
+    unit = normalize_extracted_unit(position.unit)
+    quantity = position.quantity
+
+    # Vertauschte Felder reparieren: Zahl im Einheitenfeld, Menge leer
+    if unit is not None and quantity is None and NUMBER_LIKE_PATTERN.match(unit):
+        quantity = parse_quantity(unit)
+        if quantity is not None:
+            unit = None
+
+    position.unit = unit
+    position.quantity = quantity
+    return position
+
+
 def _parse_claude_positions(raw_text: str, stage: int) -> ExtractionResult:
     try:
         data = json.loads(raw_text)
@@ -146,6 +220,7 @@ def _parse_claude_positions(raw_text: str, stage: int) -> ExtractionResult:
             f"Claude returned invalid extraction JSON at stage {stage}: {exc}",
             retryable_json=True,
         ) from exc
+    result.positions = [_normalize_position_units(position) for position in result.positions]
     return result
 
 

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Plus, X, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
+import UnitSelect from "@/components/forms/UnitSelect";
+import { normalizeUnit } from "@/lib/utils/units";
 
 interface Props {
   leistungsverzeichnisId: string;
@@ -17,18 +19,25 @@ export default function AddPositionForm({ leistungsverzeichnisId }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await fetch("/api/positions", {
+    const quantity = parseFloat(form.quantity);
+    const res = await fetch("/api/positions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         leistungsverzeichnisId,
         positionNumber: form.positionNumber,
         shortText: form.shortText,
-        unit: form.unit,
-        quantity: parseFloat(form.quantity),
+        unit: normalizeUnit(form.unit),
+        quantity: Number.isFinite(quantity) ? quantity : null,
       }),
     });
     setLoading(false);
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      alert(typeof body?.error === "string" ? body.error : "Position konnte nicht gespeichert werden.");
+      return;
+    }
     setOpen(false);
     setForm({ positionNumber: "", shortText: "", unit: "", quantity: "" });
     router.refresh();
@@ -69,18 +78,15 @@ export default function AddPositionForm({ leistungsverzeichnisId }: Props) {
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs text-gray-500">Einheit</label>
-        <input
-          required
+        <UnitSelect
           value={form.unit}
-          onChange={(e) => setForm({ ...form, unit: e.target.value })}
-          className="w-16 border border-gray-300 rounded px-2 py-1 text-sm"
-          placeholder="m²"
+          onChange={(unit) => setForm({ ...form, unit })}
+          className="w-24 border border-gray-300 rounded px-2 py-1 text-sm"
         />
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs text-gray-500">Menge</label>
         <input
-          required
           type="number"
           step="any"
           min="0"

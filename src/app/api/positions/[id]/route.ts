@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import { logAudit } from "@/lib/audit";
+import { normalizeUnit } from "@/lib/utils/units";
 import { z } from "zod";
 
 interface Params {
@@ -34,14 +35,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Position nicht gefunden" }, { status: 404 });
     }
 
+    const data = { ...parsed.data };
+    // Nur normalisieren, wenn das Feld im Payload steht (fehlend ≠ auf null setzen)
+    if ("unit" in data && data.unit !== undefined) {
+      data.unit = normalizeUnit(data.unit);
+    }
+
     const updated = await prisma.position.update({
       where: { id },
-      data: parsed.data,
+      data,
     });
 
     await logAudit(user.tenantId, user.id, "POSITION_UPDATED", "Position", id, {
       positionNumber: updated.positionNumber,
-      changes: parsed.data,
+      changes: data,
     });
 
     return NextResponse.json({ data: updated });
