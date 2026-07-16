@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { safeEqualString } from "@/lib/security";
+import { normalizeUnit } from "@/lib/utils/units";
 
 const callbackSchema = z.object({
   lvId: z.string().uuid(),
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
         positionNumber: p.positionNumber,
         shortText: p.shortText,
         longText: p.longText,
-        unit: p.unit,
+        unit: normalizeUnit(p.unit),
         quantity: p.quantity,
         trade: p.trade,
         sortOrder: p.sortOrder,

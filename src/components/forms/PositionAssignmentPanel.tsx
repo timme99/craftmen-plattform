@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, Link2, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckSquare, ChevronDown, Link2, Sparkles } from "lucide-react";
+import { getPositionWarnings } from "@/lib/utils/units";
 
 type Supplier = {
   id: string;
@@ -54,10 +55,27 @@ export default function PositionAssignmentPanel({ projectId, positions, supplier
     () => localPositions.filter((position) => position.assignedSuppliers.length === 0),
     [localPositions]
   );
+  const assignedPositions = useMemo(
+    () => localPositions.filter((position) => position.assignedSuppliers.length > 0),
+    [localPositions]
+  );
+
+  const allUnassignedSelected =
+    unassignedPositions.length > 0 &&
+    unassignedPositions.every((position) => selectedPositionIds.includes(position.id));
 
   function togglePosition(positionId: string) {
     setSelectedPositionIds((current) =>
       current.includes(positionId) ? current.filter((id) => id !== positionId) : [...current, positionId]
+    );
+  }
+
+  function toggleAllUnassigned() {
+    const unassignedIds = unassignedPositions.map((position) => position.id);
+    setSelectedPositionIds((current) =>
+      allUnassignedSelected
+        ? current.filter((id) => !unassignedIds.includes(id))
+        : Array.from(new Set([...current, ...unassignedIds]))
     );
   }
 
@@ -122,6 +140,49 @@ export default function PositionAssignmentPanel({ projectId, positions, supplier
     );
     setSelectedPositionIds([]);
     router.refresh();
+  }
+
+  function renderPositionRow(position: Position) {
+    const isUnassigned = position.assignedSuppliers.length === 0;
+    const warnings = getPositionWarnings({
+      unit: position.unit,
+      quantity: position.quantity != null ? Number(position.quantity) : null,
+    });
+    return (
+      <label
+        key={position.id}
+        className={`flex gap-3 p-4 cursor-pointer hover:bg-gray-50 ${isUnassigned ? "bg-yellow-50/50" : "bg-white"}`}
+      >
+        <input
+          type="checkbox"
+          checked={selectedPositionIds.includes(position.id)}
+          onChange={() => togglePosition(position.id)}
+          className="mt-1 h-4 w-4 accent-green-700"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-gray-900">
+            {position.positionNumber} · {position.shortText}
+          </p>
+          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+            {warnings.length > 0 && (
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" aria-label={warnings.join(" · ")} />
+            )}
+            <span title={warnings.length > 0 ? warnings.join(" · ") : undefined}>
+              Menge: {position.quantity ?? "—"} · Einheit: {position.unit ?? "—"}
+            </span>
+          </p>
+          {position.assignedSuppliers.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {position.assignedSuppliers.map((supplier) => (
+                <span key={supplier.id} className="text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded-full">
+                  {supplier.companyName}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </label>
+    );
   }
 
   return (
@@ -228,52 +289,46 @@ export default function PositionAssignmentPanel({ projectId, positions, supplier
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="divide-y divide-gray-100">
+        <div>
           {localPositions.length === 0 ? (
             <p className="p-6 text-sm text-gray-400">Noch keine extrahierten Positionen vorhanden.</p>
           ) : (
-            localPositions.map((position) => {
-              const isUnassigned = position.assignedSuppliers.length === 0;
-              return (
-                <label
-                  key={position.id}
-                  className={`flex gap-3 p-4 cursor-pointer hover:bg-gray-50 ${isUnassigned ? "bg-yellow-50" : "bg-white"}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedPositionIds.includes(position.id)}
-                    onChange={() => togglePosition(position.id)}
-                    className="mt-1 h-4 w-4 accent-green-700"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {position.positionNumber} · {position.shortText}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Menge: {position.quantity ?? "—"} · Einheit: {position.unit ?? "—"}
-                        </p>
-                      </div>
-                      {isUnassigned && (
-                        <span className="self-start text-xs font-medium text-yellow-800 bg-yellow-100 px-2 py-1 rounded-full">
-                          Nicht zugewiesen
-                        </span>
-                      )}
-                    </div>
-                    {position.assignedSuppliers.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {position.assignedSuppliers.map((supplier) => (
-                          <span key={supplier.id} className="text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded-full">
-                            {supplier.companyName}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+            <>
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-yellow-50 border-b border-yellow-100">
+                <input
+                  type="checkbox"
+                  checked={allUnassignedSelected}
+                  onChange={toggleAllUnassigned}
+                  disabled={unassignedPositions.length === 0}
+                  title="Alle nicht zugewiesenen auswählen"
+                  className="h-4 w-4 accent-green-700"
+                />
+                <p className="text-xs font-semibold uppercase tracking-wide text-yellow-800">
+                  Nicht zugewiesen ({unassignedPositions.length})
+                </p>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {unassignedPositions.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-gray-400">Alle Positionen sind zugewiesen.</p>
+                ) : (
+                  unassignedPositions.map((position) => renderPositionRow(position))
+                )}
+              </div>
+
+              {assignedPositions.length > 0 && (
+                <details open={unassignedPositions.length === 0} className="group/assigned border-t border-gray-200">
+                  <summary className="flex items-center justify-between px-4 py-2.5 bg-gray-50 cursor-pointer list-none">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Bereits zugewiesen ({assignedPositions.length})
+                    </p>
+                    <ChevronDown className="w-4 h-4 text-gray-400 transition-transform group-open/assigned:rotate-180" />
+                  </summary>
+                  <div className="divide-y divide-gray-100">
+                    {assignedPositions.map((position) => renderPositionRow(position))}
                   </div>
-                </label>
-              );
-            })
+                </details>
+              )}
+            </>
           )}
         </div>
 
