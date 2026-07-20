@@ -26,6 +26,11 @@ export async function GET() {
     url.searchParams.set("scope", scopes);
     url.searchParams.set("response_mode", "query");
     url.searchParams.set("state", state);
+    // Immer die Kontoauswahl zeigen: Bei "common" existiert dieselbe Adresse
+    // ggf. als privates UND als geschäftliches/Organisations-Konto. Ohne diesen
+    // Parameter würde eine still wiederverwendete Session das falsche (evtl.
+    // postfachlose) Konto verbinden.
+    url.searchParams.set("prompt", "select_account");
 
     const response = NextResponse.redirect(url.toString());
     response.cookies.set(OAUTH_STATE_COOKIE, state, {

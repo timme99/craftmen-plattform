@@ -6,6 +6,9 @@ import { CheckCircle, AlertCircle, Mail, Building2, Users } from "lucide-react";
 const errorMessages: Record<string, string> = {
   no_code: "Microsoft hat keinen Autorisierungscode zurückgegeben.",
   token_exchange: "Der Token-Austausch mit Microsoft ist fehlgeschlagen. Bitte versuche es erneut.",
+  invalid_state: "Die Sitzung ist abgelaufen. Bitte starte die Verbindung erneut.",
+  no_mailbox:
+    "Dieses Microsoft-Konto hat kein Postfach zum Senden. Bitte verbinde das Konto, unter dem du deine E-Mails empfängst (privates Outlook oder Firmen-Microsoft-365) – wähle es im Anmeldedialog gezielt aus.",
   unknown: "Ein unbekannter Fehler ist aufgetreten. Bitte versuche es erneut.",
 };
 

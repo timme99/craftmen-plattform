@@ -60,6 +60,10 @@ export async function POST(req: NextRequest) {
       })
     );
 
+    for (const r of results) {
+      if (r.status === "rejected") console.error("[reminders] send failed:", r.reason);
+    }
+
     const reminded = results.filter((r) => r.status === "fulfilled").length;
     return NextResponse.json({ reminded, failed: results.length - reminded, scanned: dueInquiries.length, levelCounts });
   } catch (err) {

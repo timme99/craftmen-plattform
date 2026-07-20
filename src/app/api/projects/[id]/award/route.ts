@@ -97,6 +97,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       })
     );
 
+    for (const r of results) {
+      if (r.status === "rejected") console.error("[award] notify failed:", r.reason);
+    }
+
     const notified = results.filter((r) => r.status === "fulfilled").length;
     return NextResponse.json({ success: true, notified, skipped: Math.max(0, inquiries.length - EMAIL_LIMIT) });
   } catch (err) {

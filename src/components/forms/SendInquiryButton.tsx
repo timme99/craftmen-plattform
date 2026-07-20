@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Send, X, Sparkles } from "lucide-react";
+import { Send, X, Sparkles, AlertTriangle, CheckCircle } from "lucide-react";
 
 interface Supplier {
   id: string;
@@ -16,6 +16,14 @@ interface Props {
   suppliers: Supplier[];
 }
 
+type EmailSummary = {
+  connected: boolean;
+  sent: number;
+  failed: number;
+  skipped: number;
+  results: { supplierId: string; supplierName: string; status: "sent" | "failed" | "skipped"; error?: string }[];
+};
+
 export default function SendInquiryButton({ projectId, suppliers }: Props) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -23,9 +31,17 @@ export default function SendInquiryButton({ projectId, suppliers }: Props) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [result, setResult] = useState<EmailSummary | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const router = useRouter();
+
+  function closeAndReset() {
+    setOpen(false);
+    setResult(null);
+    setSelected([]);
+    setError("");
+    router.refresh();
+  }
 
   async function draftEmail() {
     if (selected.length === 0) {
@@ -77,16 +93,25 @@ export default function SendInquiryButton({ projectId, suppliers }: Props) {
     });
 
     setLoading(false);
-    if (res.ok) {
-      setSuccess(true);
-      setTimeout(() => {
-        setOpen(false);
-        setSuccess(false);
-        setSelected([]);
-        router.refresh();
-      }, 1500);
-    } else {
+    if (!res.ok) {
       setError("Fehler beim Senden. Bitte erneut versuchen.");
+      return;
+    }
+
+    const body = (await res.json().catch(() => null)) as { email?: EmailSummary } | null;
+    const email: EmailSummary =
+      body?.email ??
+      // Fallback, falls die API (alt) kein Ergebnis mitschickt
+      { connected: true, sent: selected.length, failed: 0, skipped: 0, results: [] };
+
+    setResult(email);
+
+    // Nur bei rundum erfolgreichem Versand automatisch schließen; sonst offen
+    // lassen, damit der Nutzer den Hinweis (Entwurf / Fehler) sieht.
+    if (email.failed === 0 && email.skipped === 0 && email.sent > 0) {
+      setTimeout(closeAndReset, 1500);
+    } else {
+      router.refresh();
     }
   }
 
@@ -105,18 +130,73 @@ export default function SendInquiryButton({ projectId, suppliers }: Props) {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-5 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Anfrage an Lieferanten</h2>
-              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={closeAndReset} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {success ? (
-              <div className="p-8 text-center">
-                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Send className="w-7 h-7 text-green-600" />
+            {result ? (
+              result.sent > 0 && result.failed === 0 && result.skipped === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Send className="w-7 h-7 text-green-600" />
+                  </div>
+                  <p className="font-semibold text-gray-900">
+                    {result.sent === 1 ? "Anfrage versendet!" : `${result.sent} Anfragen versendet!`}
+                  </p>
                 </div>
-                <p className="font-semibold text-gray-900">Anfragen versendet!</p>
-              </div>
+              ) : (
+                <div className="p-5 space-y-3">
+                  {!result.connected && (
+                    <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>
+                        Kein E-Mail-Konto verbunden – die Anfragen wurden als <strong>Entwurf</strong> gespeichert und
+                        noch <strong>nicht versendet</strong>. Verbinde dein Konto in den{" "}
+                        <a href="/settings" className="underline font-medium">Einstellungen</a>.
+                      </span>
+                    </div>
+                  )}
+
+                  {result.sent > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                      <CheckCircle className="w-4 h-4 shrink-0" />
+                      <span>{result.sent === 1 ? "1 Anfrage versendet" : `${result.sent} Anfragen versendet`}</span>
+                    </div>
+                  )}
+
+                  {result.failed > 0 && (
+                    <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 space-y-1">
+                      <p className="font-medium">
+                        {result.failed === 1 ? "1 Anfrage fehlgeschlagen:" : `${result.failed} Anfragen fehlgeschlagen:`}
+                      </p>
+                      <ul className="list-disc pl-5 space-y-0.5">
+                        {result.results
+                          .filter((r) => r.status === "failed")
+                          .map((r) => (
+                            <li key={r.supplierId}>
+                              <span className="font-medium">{r.supplierName}</span>
+                              {r.error ? <span className="text-red-600"> – {r.error}</span> : null}
+                            </li>
+                          ))}
+                      </ul>
+                      <p className="text-xs text-red-600 pt-1">
+                        Diese wurden als Entwurf gespeichert und können erneut gesendet werden.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={closeAndReset}
+                      className="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-lg"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              )
             ) : (
               <div className="p-5 space-y-4">
                 {/* Supplier selection */}

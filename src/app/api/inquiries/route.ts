@@ -14,6 +14,13 @@ const createInquirySchema = z.object({
   customMessage: z.string().optional(),
 });
 
+type SendResult = {
+  supplierId: string;
+  supplierName: string;
+  status: "sent" | "failed" | "skipped";
+  error?: string;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const user = await requireTenant();
@@ -52,55 +59,83 @@ export async function POST(req: NextRequest) {
       )
     );
 
-    // Send emails if Microsoft Graph is connected
-    if (graphAccess) {
-      const results = await Promise.allSettled(
-        inquiries.map(async (inquiry) => {
-          const supplier = suppliers.find((s) => s.id === inquiry.supplierId);
-          if (!supplier) return;
+    // Pro Lieferant senden und das Ergebnis festhalten, damit die UI ehrlich
+    // anzeigen kann, was gesendet wurde und was nur als Entwurf liegen bleibt.
+    const sendResults: SendResult[] = [];
 
-          const assignedPositions = await prisma.inquiryPosition.findMany({
-            where: { inquiryId: inquiry.id, inquiry: { tenantId: user.tenantId } },
-            include: { position: true },
-            orderBy: { position: { sortOrder: "asc" } },
-          });
+    for (const inquiry of inquiries) {
+      const supplier = suppliers.find((s) => s.id === inquiry.supplierId);
+      const supplierName = supplier?.companyName ?? inquiry.supplierId;
 
-          const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/portal/${inquiry.portalToken}`;
+      if (!graphAccess) {
+        // Kein verbundenes E-Mail-Konto: Anfrage bleibt DRAFT, wird aber gemeldet.
+        sendResults.push({ supplierId: inquiry.supplierId, supplierName, status: "skipped" });
+        continue;
+      }
+      if (!supplier) {
+        sendResults.push({
+          supplierId: inquiry.supplierId,
+          supplierName,
+          status: "failed",
+          error: "Lieferant konnte nicht zugeordnet werden.",
+        });
+        continue;
+      }
 
-          await sendInquiryEmail(graphAccess.accessToken, {
-            from: graphAccess.emailAddress,
-            to: supplier.email,
-            subject: `Anfrage ${project.name} - ${supplier.companyName} - Ref:${inquiry.id}`,
-            bodyHtml: buildEmailHtml({
-              supplierName: supplier.companyName,
-              projectName: project.name,
-              portalUrl,
-              deadline: inquiry.deadline ?? undefined,
-              customMessage: validated.customMessage,
-              positions: assignedPositions.map((assignment) => assignment.position),
-            }),
-          });
+      try {
+        const assignedPositions = await prisma.inquiryPosition.findMany({
+          where: { inquiryId: inquiry.id, inquiry: { tenantId: user.tenantId } },
+          include: { position: true },
+          orderBy: { position: { sortOrder: "asc" } },
+        });
 
-          await prisma.inquiry.update({
-            where: { id: inquiry.id },
-            data: { status: "SENT", sentAt: new Date() },
-          });
+        const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/portal/${inquiry.portalToken}`;
 
-          await logAudit(user.tenantId, user.id, "INQUIRY_SENT", "Inquiry", inquiry.id, {
-            supplierId: inquiry.supplierId,
-            projectId: validated.projectId,
-          });
-        })
-      );
+        await sendInquiryEmail(graphAccess.accessToken, {
+          from: graphAccess.emailAddress,
+          to: supplier.email,
+          subject: `Anfrage ${project.name} - ${supplier.companyName} - Ref:${inquiry.id}`,
+          bodyHtml: buildEmailHtml({
+            supplierName: supplier.companyName,
+            projectName: project.name,
+            portalUrl,
+            deadline: inquiry.deadline ?? undefined,
+            customMessage: validated.customMessage,
+            positions: assignedPositions.map((assignment) => assignment.position),
+          }),
+        });
 
-      for (const result of results) {
-        if (result.status === "rejected") {
-          console.error("[inquiries] email send failed:", result.reason);
-        }
+        await prisma.inquiry.update({
+          where: { id: inquiry.id },
+          data: { status: "SENT", sentAt: new Date() },
+        });
+
+        await logAudit(user.tenantId, user.id, "INQUIRY_SENT", "Inquiry", inquiry.id, {
+          supplierId: inquiry.supplierId,
+          projectId: validated.projectId,
+        });
+
+        sendResults.push({ supplierId: supplier.id, supplierName, status: "sent" });
+      } catch (err) {
+        console.error("[inquiries] email send failed:", err);
+        sendResults.push({
+          supplierId: supplier.id,
+          supplierName,
+          status: "failed",
+          error: err instanceof Error ? err.message : "Unbekannter Fehler beim Versand.",
+        });
       }
     }
 
-    return NextResponse.json({ data: inquiries }, { status: 201 });
+    const email = {
+      connected: !!graphAccess,
+      sent: sendResults.filter((r) => r.status === "sent").length,
+      failed: sendResults.filter((r) => r.status === "failed").length,
+      skipped: sendResults.filter((r) => r.status === "skipped").length,
+      results: sendResults,
+    };
+
+    return NextResponse.json({ data: inquiries, email }, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 422 });
