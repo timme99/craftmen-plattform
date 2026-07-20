@@ -63,7 +63,17 @@ export async function GET(req: NextRequest) {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     const profile = profileRes.ok ? await profileRes.json() : null;
-    const emailAddress = profile?.mail ?? profile?.userPrincipalName ?? null;
+
+    // Nur Konten mit echtem Postfach können senden. Das "mail"-Feld ist bei einer
+    // mailbox-losen Organisations-/Gast-Identität leer — die würde beim Senden
+    // still mit 401 scheitern. Solche Verbindungen gar nicht erst speichern,
+    // sondern den Nutzer klar auf das richtige Konto hinweisen.
+    const emailAddress = profile?.mail ?? null;
+    if (!emailAddress) {
+      const response = NextResponse.redirect(`${baseUrl}/settings?error=no_mailbox`);
+      response.cookies.delete(OAUTH_STATE_COOKIE);
+      return response;
+    }
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 

@@ -36,7 +36,37 @@ export async function sendInquiryEmail(
     }));
   }
 
-  return client.api("/me/sendMail").post({ message });
+  try {
+    return await client.api("/me/sendMail").post({ message });
+  } catch (err) {
+    // Graph-Fehler in eine aussagekräftige Meldung übersetzen — sonst landet
+    // im Log nur "body: ReadableStream" und der eigentliche Grund (z. B. 401)
+    // bleibt unsichtbar.
+    throw new Error(describeGraphError(err));
+  }
+}
+
+/**
+ * Baut aus einem Microsoft-Graph-Fehler eine lesbare Meldung
+ * (Statuscode + Fehlercode + Text), ohne Tokens o. Ä. preiszugeben.
+ */
+function describeGraphError(err: unknown): string {
+  if (err && typeof err === "object") {
+    const e = err as {
+      statusCode?: number;
+      code?: string | null;
+      message?: string;
+      requestId?: string | null;
+      body?: unknown;
+    };
+    const parts: string[] = [];
+    if (typeof e.statusCode === "number") parts.push(`HTTP ${e.statusCode}`);
+    if (e.code) parts.push(String(e.code));
+    if (typeof e.message === "string" && e.message.trim()) parts.push(e.message.trim());
+    if (typeof e.body === "string" && e.body.trim()) parts.push(e.body.trim().slice(0, 300));
+    if (parts.length > 0) return `E-Mail-Versand fehlgeschlagen: ${parts.join(" – ")}`;
+  }
+  return `E-Mail-Versand fehlgeschlagen: ${String(err)}`;
 }
 
 export async function getInboxMessages(
