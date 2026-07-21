@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
           to: supplier.email,
           subject: `Anfrage ${project.name} - ${supplier.companyName} - Ref:${inquiry.id}`,
           bodyHtml: buildEmailHtml({
-            supplierName: supplier.companyName,
+            contactName: supplier.contactName,
             projectName: project.name,
             portalUrl,
             deadline: inquiry.deadline ?? undefined,
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
 }
 
 function buildEmailHtml(params: {
-  supplierName: string;
+  contactName?: string | null;
   projectName: string;
   portalUrl: string;
   deadline?: Date;
@@ -161,6 +161,12 @@ function buildEmailHtml(params: {
   const deadlineText = params.deadline
     ? `<p>Angebotsfrist: <strong>${params.deadline.toLocaleDateString("de-DE")}</strong></p>`
     : "";
+  // Persönliche Anrede des Ansprechpartners, wenn er hinterlegt ist –
+  // sonst die neutrale, aber natürliche Formanrede.
+  const contactName = params.contactName?.trim();
+  const greeting = contactName
+    ? `Guten Tag ${escapeHtml(contactName)},`
+    : "Sehr geehrte Damen und Herren,";
   const positionRows = params.positions
     .map((position) => `
       <tr>
@@ -192,7 +198,7 @@ function buildEmailHtml(params: {
         <h1 style="color: white; margin: 0; font-size: 22px;">CraftMen Plattform</h1>
       </div>
       <div style="padding: 30px; background: #ffffff;">
-        <p>Sehr geehrte Damen und Herren von <strong>${escapeHtml(params.supplierName)}</strong>,</p>
+        <p>${greeting}</p>
         <p>wir laden Sie ein, ein Angebot für das folgende Projekt abzugeben:</p>
         <p style="font-size: 18px; font-weight: bold; color: #2D6A4F;">${escapeHtml(params.projectName)}</p>
         ${deadlineText}
