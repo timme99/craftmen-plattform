@@ -38,6 +38,7 @@ export interface DraftInquiryEmailInput {
   projectDescription?: string | null;
   projectLocation?: string | null;
   supplierCompany: string;
+  supplierSalutation?: "HERR" | "FRAU" | null;
   supplierContact?: string | null;
   supplierTrade?: string | null;
   deadline?: Date | null;
@@ -65,6 +66,8 @@ export async function draftInquiryEmail(input: DraftInquiryEmailInput): Promise<
       "professionelle, höfliche Anfrage-E-Mails an Lieferanten/Nachunternehmer auf Deutsch (Sie-Form). " +
       "Der Text soll knapp und konkret sein, das Gewerk des Lieferanten berücksichtigen und zur Angebotsabgabe " +
       "für die genannten Positionen einladen. Keine Platzhalter wie [Name] verwenden – nutze die gegebenen Daten. " +
+      "Sprich den Ansprechpartner mit korrekter Anrede an (z. B. 'Sehr geehrter Herr Müller,' bzw. 'Sehr geehrte Frau Müller,'); " +
+      "ist kein Ansprechpartner genannt, verwende 'Sehr geehrte Damen und Herren,'. " +
       "Der 'body' ist eine persönliche Nachricht (Fließtext, kein HTML), die in eine bestehende E-Mail-Vorlage " +
       "eingebettet wird; wiederhole daher KEINE Positionstabelle und KEINEN Portal-Link.",
     messages: [
@@ -75,7 +78,9 @@ export async function draftInquiryEmail(input: DraftInquiryEmailInput): Promise<
           (input.projectLocation ? `Ort: ${input.projectLocation}\n` : "") +
           (input.projectDescription ? `Beschreibung: ${input.projectDescription}\n` : "") +
           `\nLieferant: ${input.supplierCompany}\n` +
-          (input.supplierContact ? `Ansprechpartner: ${input.supplierContact}\n` : "") +
+          (input.supplierContact
+            ? `Ansprechpartner: ${input.supplierSalutation === "HERR" ? "Herr " : input.supplierSalutation === "FRAU" ? "Frau " : ""}${input.supplierContact}\n`
+            : "") +
           (input.supplierTrade ? `Gewerk: ${input.supplierTrade}\n` : "") +
           (input.deadline ? `Angebotsfrist: ${input.deadline.toLocaleDateString("de-DE")}\n` : "") +
           (input.tone ? `Gewünschter Tonfall: ${input.tone}\n` : "") +

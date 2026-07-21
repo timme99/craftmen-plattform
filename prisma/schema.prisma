@@ -139,9 +139,10 @@ model Position {
 
 // ─── LIEFERANTEN (Suppliers) ───────────────────────────────────────────────────────
 model Supplier {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   tenantId    String
   companyName String
+  salutation  Salutation?
   contactName String?
   email       String
   phone       String?
@@ -158,6 +159,12 @@ model Supplier {
 
   @@unique([tenantId, email])
   @@map("suppliers")
+}
+
+// Anrede des Ansprechpartners für eine förmliche, geschlechtsspezifische Anrede.
+enum Salutation {
+  HERR
+  FRAU
 }
 
 // ─── ANFRAGEN (Inquiries) ────────────────────────────────────────────────────────────────

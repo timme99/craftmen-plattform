@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       projectDescription: project.description,
       projectLocation: project.location,
       supplierCompany: supplier.companyName,
+      supplierSalutation: supplier.salutation,
       supplierContact: supplier.contactName,
       supplierTrade: supplier.trade,
       deadline: inquiry?.deadline ?? null,

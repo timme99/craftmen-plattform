@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
           to: supplier.email,
           subject: `Anfrage ${project.name} - ${supplier.companyName} - Ref:${inquiry.id}`,
           bodyHtml: buildEmailHtml({
+            salutation: supplier.salutation,
             contactName: supplier.contactName,
             projectName: project.name,
             portalUrl,
@@ -145,7 +146,22 @@ export async function POST(req: NextRequest) {
   }
 }
 
+function buildGreeting(salutation?: "HERR" | "FRAU" | null, contactName?: string) {
+  if (contactName) {
+    if (salutation === "HERR") {
+      return `Sehr geehrter Herr ${escapeHtml(contactName)},`;
+    }
+    if (salutation === "FRAU") {
+      return `Sehr geehrte Frau ${escapeHtml(contactName)},`;
+    }
+    // Ansprechpartner bekannt, aber ohne Anrede: geschlechtsneutral und trotzdem höflich.
+    return `Guten Tag ${escapeHtml(contactName)},`;
+  }
+  return "Sehr geehrte Damen und Herren,";
+}
+
 function buildEmailHtml(params: {
+  salutation?: "HERR" | "FRAU" | null;
   contactName?: string | null;
   projectName: string;
   portalUrl: string;
@@ -161,12 +177,11 @@ function buildEmailHtml(params: {
   const deadlineText = params.deadline
     ? `<p>Angebotsfrist: <strong>${params.deadline.toLocaleDateString("de-DE")}</strong></p>`
     : "";
-  // Persönliche Anrede des Ansprechpartners, wenn er hinterlegt ist –
+  // Persönliche Anrede des Ansprechpartners, wenn er hinterlegt ist – mit
+  // förmlicher, geschlechtsspezifischer Anrede sofern die Anrede bekannt ist,
   // sonst die neutrale, aber natürliche Formanrede.
   const contactName = params.contactName?.trim();
-  const greeting = contactName
-    ? `Guten Tag ${escapeHtml(contactName)},`
-    : "Sehr geehrte Damen und Herren,";
+  const greeting = buildGreeting(params.salutation, contactName);
   const positionRows = params.positions
     .map((position) => `
       <tr>

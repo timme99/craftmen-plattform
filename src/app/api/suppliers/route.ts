@@ -5,6 +5,7 @@ import { requireTenant } from "@/lib/utils/tenant";
 
 const createSupplierSchema = z.object({
   companyName: z.string().min(2).max(100),
+  salutation: z.enum(["HERR", "FRAU"]).optional(),
   contactName: z.string().optional(),
   email: z.string().email(),
   phone: z.string().optional(),

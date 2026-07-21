@@ -6,6 +6,7 @@ import { requireTenant } from "@/lib/utils/tenant";
 
 const rowSchema = z.object({
   companyName: z.string().min(2).max(100),
+  salutation: z.enum(["HERR", "FRAU"]).optional(),
   contactName: z.string().optional(),
   email: z.string().email(),
   phone: z.string().optional(),
@@ -21,6 +22,15 @@ function cellText(cell: ExcelJS.Cell): string {
   if (v === null || v === undefined) return "";
   if (typeof v === "object" && "text" in v) return String((v as { text: string }).text);
   return String(v).trim();
+}
+
+// Freitext-Anrede aus der Excel-Spalte auf das Enum abbilden; unbekannte
+// Werte werden ignoriert, damit der Import nicht daran scheitert.
+function parseSalutation(value: string): "HERR" | "FRAU" | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "herr") return "HERR";
+  if (normalized === "frau") return "FRAU";
+  return undefined;
 }
 
 export async function POST(req: NextRequest) {
@@ -52,12 +62,13 @@ export async function POST(req: NextRequest) {
 
       const raw = {
         companyName: cellText(row.getCell(1)),
-        contactName: cellText(row.getCell(2)) || undefined,
-        email: cellText(row.getCell(3)),
-        phone: cellText(row.getCell(4)) || undefined,
-        address: cellText(row.getCell(5)) || undefined,
-        trade: cellText(row.getCell(6)) || undefined,
-        notes: cellText(row.getCell(7)) || undefined,
+        salutation: parseSalutation(cellText(row.getCell(2))),
+        contactName: cellText(row.getCell(3)) || undefined,
+        email: cellText(row.getCell(4)),
+        phone: cellText(row.getCell(5)) || undefined,
+        address: cellText(row.getCell(6)) || undefined,
+        trade: cellText(row.getCell(7)) || undefined,
+        notes: cellText(row.getCell(8)) || undefined,
       };
 
       if (!raw.companyName && !raw.email) return;
