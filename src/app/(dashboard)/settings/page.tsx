@@ -1,6 +1,7 @@
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import DisconnectMicrosoftButton from "@/components/forms/DisconnectMicrosoftButton";
+import TenantLogoUploader from "@/components/forms/TenantLogoUploader";
 import { CheckCircle, AlertCircle, Mail, Building2, Users } from "lucide-react";
 
 const errorMessages: Record<string, string> = {
@@ -119,6 +120,18 @@ export default async function SettingsPage({
           <Building2 className="w-5 h-5 text-gray-500" />
           <h2 className="text-base font-semibold text-gray-900">Firmen-Profil</h2>
         </div>
+
+        <div>
+          <p className="text-xs text-gray-400 mb-2">Firmenlogo</p>
+          <TenantLogoUploader
+            logoUrl={user.tenant.logoUrl}
+            canManage={user.role === "OWNER" || user.role === "ADMIN"}
+          />
+          <p className="text-xs text-gray-400 mt-2">
+            Das Logo erscheint in der App sowie in den Anfrage-E-Mails an Ihre Lieferanten.
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-gray-400 mb-1">Firmenname</p>

@@ -6,18 +6,31 @@ import { cn } from "@/lib/utils/cn";
 import { Leaf, Sparkles } from "lucide-react";
 import { navItems } from "./nav-items";
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+interface BrandingProps {
+  onNavigate?: () => void;
+  logoUrl?: string | null;
+  companyName?: string | null;
+}
+
+function SidebarContent({ onNavigate, logoUrl, companyName }: BrandingProps) {
   const pathname = usePathname();
 
   return (
     <div className="flex h-full flex-col bg-gradient-to-b from-green-950 via-green-900 to-emerald-900 text-white">
       <div className="px-5 py-5 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-green-300/90 flex items-center justify-center shadow-sm shadow-green-950/40">
-            <Leaf className="w-5 h-5 text-green-950" />
+          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center overflow-hidden shadow-sm shadow-green-950/40 shrink-0">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={companyName ?? "Logo"} className="max-w-full max-h-full object-contain" />
+            ) : (
+              <Leaf className="w-5 h-5 text-green-950" />
+            )}
           </div>
-          <div>
-            <p className="text-white font-semibold text-sm leading-tight tracking-wide">CraftMen</p>
+          <div className="min-w-0">
+            <p className="text-white font-semibold text-sm leading-tight tracking-wide truncate">
+              {companyName || "CraftMen"}
+            </p>
             <p className="text-green-200/90 text-xs leading-tight">Ausschreibungsplattform</p>
           </div>
         </div>
@@ -60,10 +73,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ logoUrl, companyName }: { logoUrl?: string | null; companyName?: string | null }) {
   return (
     <aside className="hidden md:block w-64 flex-shrink-0">
-      <SidebarContent />
+      <SidebarContent logoUrl={logoUrl} companyName={companyName} />
     </aside>
   );
 }
