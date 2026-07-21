@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
-import EmailScannerButton from "@/components/forms/EmailScannerButton";
 import SendInquiryButton from "@/components/forms/SendInquiryButton";
 import PositionAssignmentPanel from "@/components/forms/PositionAssignmentPanel";
 import OfferDetailModal from "@/components/dashboard/OfferDetailModal";
@@ -100,7 +99,6 @@ export default async function AnfragenPage({ params }: Props) {
         </div>
         <div className="flex items-center gap-3">
           {received > 0 && <OfferAnalysisButton projectId={project.id} />}
-          <EmailScannerButton />
           <SendInquiryButton projectId={project.id} suppliers={allSuppliers} />
         </div>
       </div>
