@@ -4,12 +4,15 @@ import { prisma } from "@/lib/prisma/client";
 import { requireTenant } from "@/lib/utils/tenant";
 import { logAudit } from "@/lib/audit";
 
+interface Params {
+  params: Promise<{ id: string }>;
+}
+
 // Angebot manuell einpflegen (bzw. aus PDF-Upload bestätigt) — authentifiziert, im Preisspiegel.
 // Ein Offer hängt zwingend an einer Inquiry; darum wird bei Bedarf eine versandlose
 // Anfrage (Ad-hoc) für den gewählten Lieferanten angelegt bzw. wiederverwendet.
 const manualOfferSchema = z
   .object({
-    projectId: z.string().uuid(),
     supplierId: z.string().uuid().optional(),
     newSupplier: z
       .object({
@@ -35,14 +38,15 @@ const manualOfferSchema = z
     path: ["supplierId"],
   });
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest, { params }: Params) {
   try {
     const user = await requireTenant();
+    const { id: projectId } = await params;
     const body = await req.json();
     const validated = manualOfferSchema.parse(body);
 
     const project = await prisma.project.findFirst({
-      where: { id: validated.projectId, tenantId: user.tenantId },
+      where: { id: projectId, tenantId: user.tenantId },
       include: {
         leistungsverzeichnis: {
           where: { extractionStatus: "COMPLETED" },

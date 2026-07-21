@@ -6,12 +6,18 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { matchExtractedPositions } from "@/lib/matching/semantic";
 import { extractPositionsFromPdf, isAiEnabled } from "@/lib/anthropic/client";
 
+interface Params {
+  params: Promise<{ id: string }>;
+}
+
 // Liest ein hochgeladenes Angebots-PDF per Claude aus und matcht es gegen das Projekt-LV.
 // Speichert NICHTS — liefert nur eine Vorschau zur Prüfung/Korrektur, die dann über
-// /api/offers/manual bestätigt wird.
-export async function POST(req: NextRequest) {
+// POST /api/projects/[id]/offers bestätigt wird.
+export async function POST(req: NextRequest, { params }: Params) {
   try {
     const user = await requireTenant();
+    const { id: projectId } = await params;
+
     if (!isAiEnabled()) {
       return NextResponse.json({ error: "KI nicht konfiguriert" }, { status: 503 });
     }
@@ -21,10 +27,9 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const projectId = formData.get("projectId") as string | null;
 
-    if (!file || !projectId) {
-      return NextResponse.json({ error: "file und projectId erforderlich" }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: "file erforderlich" }, { status: 400 });
     }
     if (file.type && !file.type.includes("pdf") && !file.name.toLowerCase().endsWith(".pdf")) {
       return NextResponse.json({ error: "Nur PDF-Dateien werden unterstützt." }, { status: 400 });
@@ -104,7 +109,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
-      console.error("[offers/parse-upload] Anthropic error:", err.status, err.message);
+      console.error("[projects/offers/parse-upload] Anthropic error:", err.status, err.message);
       return NextResponse.json({ error: "KI-Dienst-Fehler" }, { status: err.status === 429 ? 429 : 502 });
     }
     console.error(err);

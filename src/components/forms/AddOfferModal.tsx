@@ -91,10 +91,9 @@ export default function AddOfferModal({ projectId, suppliers, positions }: Props
 
     const fd = new FormData();
     fd.append("file", file);
-    fd.append("projectId", projectId);
 
     try {
-      const res = await fetch("/api/offers/parse-upload", { method: "POST", body: fd });
+      const res = await fetch(`/api/projects/${projectId}/offers/parse-upload`, { method: "POST", body: fd });
       const body = await res.json();
       if (!res.ok) {
         setError(typeof body.error === "string" ? body.error : "PDF konnte nicht ausgelesen werden.");
@@ -151,7 +150,6 @@ export default function AddOfferModal({ projectId, suppliers, positions }: Props
     }
 
     const payload: Record<string, unknown> = {
-      projectId,
       items,
       vatRate: Number(vatRate) || 0,
       notes: notes.trim() || undefined,
@@ -169,7 +167,7 @@ export default function AddOfferModal({ projectId, suppliers, positions }: Props
 
     setSaving(true);
     try {
-      const res = await fetch("/api/offers/manual", {
+      const res = await fetch(`/api/projects/${projectId}/offers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
