@@ -78,20 +78,37 @@ export default async function SettingsPage({
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 rounded-lg px-4 py-3">
               <AlertCircle className="w-4 h-4 shrink-0 text-orange-400" />
-              <span>Kein Outlook-Konto verbunden. Verbinde dein Konto, um E-Mails automatisch zu senden und zu empfangen.</span>
+              <span>Kein Outlook-Konto verbunden. Wähle den passenden Kontotyp, um E-Mails automatisch zu senden und zu empfangen.</span>
             </div>
-            <a
-              href="/api/auth/microsoft"
-              className="inline-flex items-center gap-2 bg-[#0078D4] hover:bg-[#106EBE] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 23 23" fill="none">
-                <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
-                <rect x="12" y="1" width="10" height="10" fill="#7FBA00"/>
-                <rect x="1" y="12" width="10" height="10" fill="#00A4EF"/>
-                <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
-              </svg>
-              Mit Outlook verbinden
-            </a>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <a
+                href="/api/auth/microsoft?type=personal"
+                className="inline-flex items-center justify-center gap-2 bg-[#0078D4] hover:bg-[#106EBE] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 23 23" fill="none">
+                  <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+                  <rect x="12" y="1" width="10" height="10" fill="#7FBA00"/>
+                  <rect x="1" y="12" width="10" height="10" fill="#00A4EF"/>
+                  <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
+                </svg>
+                Privates Outlook verbinden
+              </a>
+              <a
+                href="/api/auth/microsoft?type=work"
+                className="inline-flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 23 23" fill="none">
+                  <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
+                  <rect x="12" y="1" width="10" height="10" fill="#7FBA00"/>
+                  <rect x="1" y="12" width="10" height="10" fill="#00A4EF"/>
+                  <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
+                </svg>
+                Firma (Microsoft 365) verbinden
+              </a>
+            </div>
+            <p className="text-xs text-gray-400">
+              Privat: outlook.com, hotmail.de, live.de. Firma: dein geschäftliches Microsoft-365-Konto.
+            </p>
           </div>
         )}
       </section>
