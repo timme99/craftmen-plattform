@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu, X } from "lucide-react";
@@ -9,10 +8,12 @@ import { SidebarContent } from "./Sidebar";
 import { sectionTitleForPath } from "./nav-items";
 
 interface Props {
-  user: User;
+  userEmail: string;
+  logoUrl?: string | null;
+  companyName?: string | null;
 }
 
-export default function TopBar({ user }: Props) {
+export default function TopBar({ userEmail, logoUrl, companyName }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -34,15 +35,27 @@ export default function TopBar({ user }: Props) {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-gray-400">CraftMen</p>
-            <p className="text-sm font-medium text-gray-700">{sectionTitleForPath(pathname)}</p>
+          <div className="flex items-center gap-2.5">
+            {logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt={companyName ?? "Logo"}
+                className="h-8 max-w-32 object-contain hidden sm:block"
+              />
+            )}
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-400 truncate max-w-40">
+                {companyName || "CraftMen"}
+              </p>
+              <p className="text-sm font-medium text-gray-700">{sectionTitleForPath(pathname)}</p>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right">
             <p className="text-xs text-gray-500">Angemeldet als</p>
-            <p className="text-sm text-gray-700 font-medium truncate max-w-64">{user.email}</p>
+            <p className="text-sm text-gray-700 font-medium truncate max-w-64">{userEmail}</p>
           </div>
           <button
             onClick={handleSignOut}
@@ -63,7 +76,11 @@ export default function TopBar({ user }: Props) {
             aria-hidden
           />
           <div className="absolute inset-y-0 left-0 w-64 shadow-xl">
-            <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
+            <SidebarContent
+              onNavigate={() => setMobileNavOpen(false)}
+              logoUrl={logoUrl}
+              companyName={companyName}
+            />
             <button
               onClick={() => setMobileNavOpen(false)}
               className="absolute top-4 right-3 p-1.5 rounded-lg text-green-100 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"

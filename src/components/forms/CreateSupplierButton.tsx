@@ -9,6 +9,7 @@ import { z } from "zod";
 
 const schema = z.object({
   companyName: z.string().min(2, "Mindestens 2 Zeichen"),
+  salutation: z.enum(["HERR", "FRAU"]).optional(),
   contactName: z.string().optional(),
   email: z.string().email("Ungültige E-Mail"),
   phone: z.string().optional(),
@@ -67,9 +68,46 @@ export default function CreateSupplierButton() {
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Firma *</label>
+                <input
+                  {...register("companyName")}
+                  placeholder="Musterbau GmbH"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                {errors.companyName && (
+                  <p className="text-red-500 text-xs mt-1">{errors.companyName?.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-[7rem_1fr] gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Anrede</label>
+                  <select
+                    {...register("salutation", {
+                      setValueAs: (v) => (v === "" ? undefined : v),
+                    })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">–</option>
+                    <option value="HERR">Herr</option>
+                    <option value="FRAU">Frau</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ansprechpartner</label>
+                  <input
+                    {...register("contactName")}
+                    placeholder="Max Mustermann"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  {errors.contactName && (
+                    <p className="text-red-500 text-xs mt-1">{errors.contactName?.message}</p>
+                  )}
+                </div>
+              </div>
+
               {[
-                { name: "companyName" as const, label: "Firma *", placeholder: "Musterbau GmbH" },
-                { name: "contactName" as const, label: "Ansprechpartner", placeholder: "Max Mustermann" },
                 { name: "email" as const, label: "E-Mail *", placeholder: "info@musterbau.de" },
                 { name: "phone" as const, label: "Telefon", placeholder: "+49 123 456789" },
                 { name: "trade" as const, label: "Gewerk", placeholder: "Pflasterarbeiten" },

@@ -22,6 +22,7 @@ export async function GET() {
 
     const columns = [
       { header: "Firma *", key: "companyName", width: 30 },
+      { header: "Anrede", key: "salutation", width: 12 },
       { header: "Ansprechpartner", key: "contactName", width: 25 },
       { header: "E-Mail *", key: "email", width: 30 },
       { header: "Telefon", key: "phone", width: 20 },
@@ -46,6 +47,7 @@ export async function GET() {
     for (const s of suppliers) {
       const row = sheet.addRow({
         companyName: s.companyName,
+        salutation: s.salutation === "HERR" ? "Herr" : s.salutation === "FRAU" ? "Frau" : "",
         contactName: s.contactName ?? "",
         email: s.email,
         phone: s.phone ?? "",

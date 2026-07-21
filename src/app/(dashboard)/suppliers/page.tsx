@@ -42,7 +42,10 @@ export default async function SuppliersPage() {
                 <div>
                   <h3 className="font-semibold text-gray-900">{s.companyName}</h3>
                   {s.contactName && (
-                    <p className="text-sm text-gray-500">{s.contactName}</p>
+                    <p className="text-sm text-gray-500">
+                      {s.salutation === "HERR" ? "Herr " : s.salutation === "FRAU" ? "Frau " : ""}
+                      {s.contactName}
+                    </p>
                   )}
                 </div>
                 {s.trade && (

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentTenant } from "@/lib/utils/tenant";
 import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
 
@@ -8,18 +8,18 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const dbUser = await getCurrentTenant();
 
-  if (!user) redirect("/login");
+  if (!dbUser) redirect("/login");
+
+  const logoUrl = dbUser.tenant.logoUrl;
+  const companyName = dbUser.tenant.name;
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+      <Sidebar logoUrl={logoUrl} companyName={companyName} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar user={user} />
+        <TopBar userEmail={dbUser.email} logoUrl={logoUrl} companyName={companyName} />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>

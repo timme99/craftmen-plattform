@@ -11,6 +11,7 @@ model Tenant {
   id        String   @id @default(uuid())
   name      String
   slug      String   @unique
+  logoUrl   String?
   plan      Plan     @default(FREE)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -139,9 +140,10 @@ model Position {
 
 // ─── LIEFERANTEN (Suppliers) ───────────────────────────────────────────────────────
 model Supplier {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   tenantId    String
   companyName String
+  salutation  Salutation?
   contactName String?
   email       String
   phone       String?
@@ -158,6 +160,12 @@ model Supplier {
 
   @@unique([tenantId, email])
   @@map("suppliers")
+}
+
+// Anrede des Ansprechpartners für eine förmliche, geschlechtsspezifische Anrede.
+enum Salutation {
+  HERR
+  FRAU
 }
 
 // ─── ANFRAGEN (Inquiries) ────────────────────────────────────────────────────────────────

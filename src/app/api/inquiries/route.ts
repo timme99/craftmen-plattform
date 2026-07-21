@@ -96,7 +96,10 @@ export async function POST(req: NextRequest) {
           to: supplier.email,
           subject: `Anfrage ${project.name} - ${supplier.companyName} - Ref:${inquiry.id}`,
           bodyHtml: buildEmailHtml({
+            salutation: supplier.salutation,
             contactName: supplier.contactName,
+            companyName: user.tenant.name,
+            logoUrl: user.tenant.logoUrl,
             projectName: project.name,
             portalUrl,
             deadline: inquiry.deadline ?? undefined,
@@ -145,8 +148,25 @@ export async function POST(req: NextRequest) {
   }
 }
 
+function buildGreeting(salutation?: "HERR" | "FRAU" | null, contactName?: string) {
+  if (contactName) {
+    if (salutation === "HERR") {
+      return `Sehr geehrter Herr ${escapeHtml(contactName)},`;
+    }
+    if (salutation === "FRAU") {
+      return `Sehr geehrte Frau ${escapeHtml(contactName)},`;
+    }
+    // Ansprechpartner bekannt, aber ohne Anrede: geschlechtsneutral und trotzdem höflich.
+    return `Guten Tag ${escapeHtml(contactName)},`;
+  }
+  return "Sehr geehrte Damen und Herren,";
+}
+
 function buildEmailHtml(params: {
+  salutation?: "HERR" | "FRAU" | null;
   contactName?: string | null;
+  companyName: string;
+  logoUrl?: string | null;
   projectName: string;
   portalUrl: string;
   deadline?: Date;
@@ -161,12 +181,11 @@ function buildEmailHtml(params: {
   const deadlineText = params.deadline
     ? `<p>Angebotsfrist: <strong>${params.deadline.toLocaleDateString("de-DE")}</strong></p>`
     : "";
-  // Persönliche Anrede des Ansprechpartners, wenn er hinterlegt ist –
+  // Persönliche Anrede des Ansprechpartners, wenn er hinterlegt ist – mit
+  // förmlicher, geschlechtsspezifischer Anrede sofern die Anrede bekannt ist,
   // sonst die neutrale, aber natürliche Formanrede.
   const contactName = params.contactName?.trim();
-  const greeting = contactName
-    ? `Guten Tag ${escapeHtml(contactName)},`
-    : "Sehr geehrte Damen und Herren,";
+  const greeting = buildGreeting(params.salutation, contactName);
   const positionRows = params.positions
     .map((position) => `
       <tr>
@@ -190,13 +209,24 @@ function buildEmailHtml(params: {
       </tbody>
     </table>`;
 
+  // Kopfbereich mit dem Branding des Absenders (Mandant): Logo, falls
+  // hinterlegt, ansonsten der Firmenname – so tritt die E-Mail unter dem
+  // Namen des Handwerksbetriebs und nicht der Plattform auf.
+  const companyName = escapeHtml(params.companyName);
+  const logoBlock = params.logoUrl
+    ? `<img src="${escapeHtml(params.logoUrl)}" alt="${companyName}" style="max-height: 52px; max-width: 240px; display: block; margin-bottom: 10px;" />`
+    : "";
+  const header = `
+      <div style="background: #ffffff; padding: 24px 30px; border-bottom: 3px solid #2D6A4F;">
+        ${logoBlock}
+        <span style="color: #2D6A4F; font-size: 20px; font-weight: bold;">${companyName}</span>
+      </div>`;
+
   return `
     <!DOCTYPE html>
     <html lang="de">
     <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
-      <div style="background: #2D6A4F; padding: 20px 30px;">
-        <h1 style="color: white; margin: 0; font-size: 22px;">CraftMen Plattform</h1>
-      </div>
+      ${header}
       <div style="padding: 30px; background: #ffffff;">
         <p>${greeting}</p>
         <p>wir laden Sie ein, ein Angebot für das folgende Projekt abzugeben:</p>
