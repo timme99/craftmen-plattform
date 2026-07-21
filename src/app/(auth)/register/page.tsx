@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Leaf } from "lucide-react";
 
@@ -12,35 +10,24 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const supabase = createClient();
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
-
-    const isExistingAccount = Boolean(
-      data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0
-    );
-
-    if (signUpError || !data.user || isExistingAccount) {
-      if (isExistingAccount) {
-        setError("Diese E-Mail ist bereits registriert. Bitte melde dich an.");
-      } else {
-        setError(signUpError?.message ?? "Registrierung fehlgeschlagen");
-      }
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyName, email, password }),
+      });
+    } catch {
+      setError("Registrierung fehlgeschlagen. Bitte versuche es erneut.");
       setLoading(false);
       return;
     }
-
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ companyName, email, supabaseId: data.user.id }),
-    });
 
     if (!res.ok) {
       let body: { error?: string } = {};
@@ -49,12 +36,13 @@ export default function RegisterPage() {
       } catch {
         // no-op
       }
-      setError(body.error ?? "Tenant-Erstellung fehlgeschlagen");
+      setError(body.error ?? "Registrierung fehlgeschlagen");
       setLoading(false);
       return;
     }
 
-    router.push("/projects");
+    // Full page navigation so the freshly set session cookie is picked up.
+    window.location.href = "/projects";
   }
 
   return (
