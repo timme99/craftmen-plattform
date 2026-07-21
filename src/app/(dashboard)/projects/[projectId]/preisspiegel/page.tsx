@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/utils/tenant";
 import { prisma } from "@/lib/prisma/client";
 import ExportPreisspiegelButton from "@/components/forms/ExportPreisspiegelButton";
+import AddOfferModal from "@/components/forms/AddOfferModal";
+import EmailScannerButton from "@/components/forms/EmailScannerButton";
 import { BarChart2 } from "lucide-react";
 
 interface Props {
@@ -41,7 +43,20 @@ export default async function PreisspiegelPage({ params }: Props) {
 
   if (!project) notFound();
 
+  const activeSuppliers = await prisma.supplier.findMany({
+    where: { tenantId: user.tenantId, isActive: true },
+    orderBy: { companyName: "asc" },
+    select: { id: true, companyName: true, email: true },
+  });
+
   const positions = project.leistungsverzeichnis.flatMap((lv) => lv.positions);
+  const positionOptions = positions.map((pos) => ({
+    id: pos.id,
+    positionNumber: pos.positionNumber,
+    shortText: pos.shortText,
+    unit: pos.unit,
+    quantity: pos.quantity?.toString() ?? null,
+  }));
   const suppliers = project.inquiries
     .filter((inq) => inq.offers.length > 0)
     .map((inq) => ({
@@ -112,7 +127,11 @@ export default async function PreisspiegelPage({ params }: Props) {
             {suppliers.length} von {totalInquiries} Lieferanten haben geantwortet
           </p>
         </div>
-        {suppliers.length > 0 && <ExportPreisspiegelButton projectId={project.id} />}
+        <div className="flex flex-wrap items-center gap-3">
+          <EmailScannerButton />
+          <AddOfferModal projectId={project.id} suppliers={activeSuppliers} positions={positionOptions} />
+          {suppliers.length > 0 && <ExportPreisspiegelButton projectId={project.id} />}
+        </div>
       </div>
 
       {(missingPositions.length > 0 || outlierWarnings.length > 0) && (
