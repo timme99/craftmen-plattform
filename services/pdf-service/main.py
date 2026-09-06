@@ -81,20 +81,6 @@ class ExtractionPipelineError(Exception):
 
 # ─── POSITION PARSER ─────────────────────────────────────────────────────────
 
-POSITION_PATTERN = re.compile(
-    r"""
-    ^(?P<pos_num>\d{1,2}[.\-]\d{1,3}(?:[.\-]\d{1,3})?)
-    \s+
-    (?P<short_text>.+?)
-    (?:\s{2,}(?P<unit>[a-zA-Z²³/]+(?:\s[a-zA-Z²³/]+)?))?
-    (?:\s+(?P<qty>[\d,.]+))?
-    $
-    """,
-    re.VERBOSE,
-)
-
-UNIT_KEYWORDS = {"m²", "m2", "m³", "m3", "m", "lm", "psch", "stk", "stück", "t", "kg", "l"}
-
 # Spiegelt src/lib/utils/units.ts (CANONICAL_UNITS / UNIT_ALIASES) — Änderungen dort nachziehen
 ALLOWED_UNITS = ["m²", "m³", "m", "lfm", "km", "Stk", "psch", "t", "kg", "g", "l", "h", "Tag"]
 
@@ -150,6 +136,58 @@ def parse_quantity(raw: str) -> Optional[float]:
         return float(cleaned)
     except ValueError:
         return None
+
+
+# ─── Kostenloser lokaler Parser (Stufe 0, ohne KI) ─────────────────────────────
+# Erkennt Positionen tabellarischer Leistungsverzeichnisse direkt aus dem
+# pdfplumber-Text – ohne Claude-Aufruf, spart also API-Kosten.
+_LOCAL_UNIT_TOKENS = sorted(
+    set(list(UNIT_ALIAS_MAP.keys()) + [u.lower() for u in ALLOWED_UNITS]),
+    key=len,
+    reverse=True,  # längere Einheiten zuerst, damit z.B. "m²" vor "m" greift
+)
+_LOCAL_UNIT_RE = "|".join(re.escape(u) for u in _LOCAL_UNIT_TOKENS)
+_LOCAL_POS_NUM_RE = re.compile(r"^\s*(\d{1,4}(?:[.\-]\d{1,4}){1,3})\s+(\S.*)$")
+_LOCAL_QTY_UNIT_RE = re.compile(
+    r"(?P<qty>\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:[.,]\d+)?)\s*(?P<unit>" + _LOCAL_UNIT_RE + r")(?![A-Za-zÄÖÜäöü])",
+    re.IGNORECASE,
+)
+MIN_LOCAL_POSITIONS = 3
+
+
+def parse_positions_locally(text: str) -> list[ExtractedPosition]:
+    """Regex-Parser über den pdfplumber-Text – kostenlos, ohne KI. Erfasst nur
+    Zeilen mit Ordnungszahl + Menge + Einheit, um Fehltreffer (Überschriften,
+    Datumsangaben) zu vermeiden. Reicht die Trefferzahl nicht, übernimmt Claude."""
+    positions: list[ExtractedPosition] = []
+    for line in text.splitlines():
+        m = _LOCAL_POS_NUM_RE.match(line)
+        if not m:
+            continue
+        pos_num, rest = m.group(1), m.group(2).strip()
+        # Letzte Menge+Einheit nehmen – in tabellarischen LV stehen sie am
+        # Zeilenende, während frühere Treffer aus dem Beschreibungstext stammen
+        # (z.B. "H 3-4m").
+        matches = list(_LOCAL_QTY_UNIT_RE.finditer(rest))
+        if not matches:
+            continue
+        qm = matches[-1]
+        qty = parse_quantity(qm.group("qty"))
+        if qty is None:
+            continue
+        short_text = rest[: qm.start()].strip(" .\t-–") or rest
+        positions.append(
+            ExtractedPosition(
+                positionNumber=pos_num,
+                shortText=short_text,
+                longText=None,
+                unit=normalize_extracted_unit(qm.group("unit")),
+                quantity=qty,
+                trade=None,
+                sortOrder=len(positions),
+            )
+        )
+    return positions
 
 
 def _position_schema_prompt() -> str:
@@ -266,40 +304,51 @@ def extract_text_with_ocr(pdf_bytes: bytes) -> str:
     return "\n".join(pytesseract.image_to_string(page) for page in pages).strip()
 
 
-def pdf_pages_as_png_data(pdf_bytes: bytes) -> list[str]:
-    images = []
-    for page in convert_from_bytes(pdf_bytes):
-        buf = BytesIO()
-        page.save(buf, format="PNG")
-        images.append(base64.b64encode(buf.getvalue()).decode("ascii"))
-    return images
-
-
-async def extract_with_claude_vision(pdf_bytes: bytes) -> ExtractionResult:
-    content: list[dict] = [{"type": "text", "text": _position_schema_prompt()}]
-    content.extend(
-        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": image}}
-        for image in pdf_pages_as_png_data(pdf_bytes)
-    )
+async def extract_with_claude_pdf(pdf_bytes: bytes) -> ExtractionResult:
+    # PDF nativ als Dokument an Claude schicken (kein poppler/pdf2image nötig –
+    # funktioniert daher auch in Serverless-Umgebungen ohne poppler-Binary).
+    pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
+    content: list[dict] = [
+        {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64}},
+        {"type": "text", "text": _position_schema_prompt()},
+    ]
     return await call_claude_for_positions([{"role": "user", "content": content}], 3)
 
 
 async def extract_from_pdf_bytes(pdf_bytes: bytes) -> ExtractionResult:
     stage_errors: list[str] = []
 
+    # Gemeinsamer pdfplumber-Text für Stufe 0 (lokal) und Stufe 1 (Claude).
+    text = ""
     try:
         text = extract_text_with_pdfplumber(pdf_bytes)
-        if len(text) >= MIN_EXTRACTED_TEXT_LENGTH:
-            logger.info("PDF extraction succeeded with stage 1 (pdfplumber)")
-            return await structure_text_with_claude(text, 1)
-        stage_errors.append(f"stage 1 produced only {len(text)} characters")
-    except ExtractionPipelineError as exc:
-        if exc.retryable_json:
-            raise
-        stage_errors.append(f"stage 1 failed: {exc}")
     except Exception as exc:
-        stage_errors.append(f"stage 1 failed: {exc}")
-    logger.info("PDF extraction stage 1 unavailable; falling back to stage 2")
+        stage_errors.append(f"stage 1 text extraction failed: {exc}")
+
+    if len(text) >= MIN_EXTRACTED_TEXT_LENGTH:
+        # Stufe 0: kostenloser lokaler Parser (keine KI-Kosten).
+        try:
+            local = parse_positions_locally(text)
+            if len(local) >= MIN_LOCAL_POSITIONS:
+                logger.info("PDF extraction succeeded with stage 0 (local parser, no AI)")
+                return ExtractionResult(positions=local, extraction_stage=0)
+            stage_errors.append(f"stage 0 (local parser) found only {len(local)} positions")
+        except Exception as exc:
+            stage_errors.append(f"stage 0 (local parser) failed: {exc}")
+
+        # Stufe 1: Claude strukturiert den extrahierten Text.
+        try:
+            logger.info("PDF extraction using stage 1 (pdfplumber + Claude)")
+            return await structure_text_with_claude(text, 1)
+        except ExtractionPipelineError as exc:
+            if exc.retryable_json:
+                raise
+            stage_errors.append(f"stage 1 failed: {exc}")
+        except Exception as exc:
+            stage_errors.append(f"stage 1 failed: {exc}")
+    else:
+        stage_errors.append(f"stage 1 produced only {len(text)} characters")
+    logger.info("PDF extraction stages 0/1 unavailable; falling back to stage 2")
 
     try:
         text = extract_text_with_ocr(pdf_bytes)
@@ -316,13 +365,16 @@ async def extract_from_pdf_bytes(pdf_bytes: bytes) -> ExtractionResult:
     logger.info("PDF extraction stage 2 unavailable; falling back to stage 3")
 
     try:
-        result = await extract_with_claude_vision(pdf_bytes)
-        logger.info("PDF extraction succeeded with stage 3 (Claude Vision)")
+        result = await extract_with_claude_pdf(pdf_bytes)
+        logger.info("PDF extraction succeeded with stage 3 (Claude native PDF)")
         return result
     except Exception as exc:
         stage_errors.append(f"stage 3 failed: {exc}")
-        logger.exception("PDF extraction failed in stage 3 (Claude Vision)")
-        raise ExtractionPipelineError("All PDF extraction stages failed", stage_errors) from exc
+        logger.exception("PDF extraction failed in stage 3 (Claude native PDF)")
+        raise ExtractionPipelineError(
+            "All PDF extraction stages failed: " + " | ".join(stage_errors),
+            stage_errors,
+        ) from exc
 
 
 # ─── ROUTES ──────────────────────────────────────────────────────────────────
