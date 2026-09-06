@@ -43,6 +43,7 @@ next-env.d.ts
 /src/generated/prisma
 
 # Python microservice
+api/__pycache__/
 services/pdf-service/__pycache__/
 services/pdf-service/*.egg-info/
 services/pdf-service/venv/
